@@ -503,6 +503,10 @@ If a node becomes unresponsive:
 - SSH access with sudo privileges
 - Minimum 2 CPU, 4 GB RAM per node (4 CPU, 8 GB recommended for masters)
 
+## Acknowledgements
+
+This project was developed with the assistance of [Claude Code](https://claude.ai) (Opus 4.6).
+
 ## License
 
 Apache License 2.0
