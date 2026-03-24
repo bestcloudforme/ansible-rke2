@@ -1,4 +1,0 @@
----
-customer_name: "ha-example"
-customer_env: "prod"
-customer_notes: "Example HA cluster with HAProxy + keepalived"

@@ -1,0 +1,4 @@
+---
+cluster_name: "example"
+cluster_env: "dev"
+cluster_notes: "Example single-master cluster for testing"

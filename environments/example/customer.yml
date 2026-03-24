@@ -1,4 +1,0 @@
----
-customer_name: "example"
-customer_env: "dev"
-customer_notes: "Example single-master cluster for testing"

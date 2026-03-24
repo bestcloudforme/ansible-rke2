@@ -1,0 +1,4 @@
+---
+cluster_name: "ha-example"
+cluster_env: "prod"
+cluster_notes: "Example HA cluster with HAProxy + keepalived"

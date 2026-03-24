@@ -33,5 +33,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EKS Distro image override
 - Production hardening: etcd snapshots, audit logging, PSA, resource reservations
 - Canal, Calico, and Cilium CNI support
-- Multi-customer environment structure
+- Multi-cluster environment structure
 - Example environments (single-master and HA)

@@ -13,7 +13,7 @@ Production-ready Ansible playbooks for deploying RKE2 Kubernetes clusters. Suppo
 - **EKS Distro**: Private registry mirror for EKS-D images
 - **Custom Manifests**: Auto-deploy custom Kubernetes manifests on server start
 - **Production Hardening**: etcd snapshots, audit logging, Pod Security Admission, resource reservations, kernel hardening, system limits, log rotation
-- **Multi-Customer**: Shared roles, per-customer environment configs
+- **Multi-Environment**: Shared roles, per-cluster environment configs
 - **Rolling Upgrades**: Masters serial:1, workers serial:25% with drain/uncordon
 
 ## Quick Start
@@ -42,12 +42,12 @@ ansible-rke2/
 │   │   ├── inventory/
 │   │   │   ├── hosts.yml
 │   │   │   └── group_vars/
-│   │   └── customer.yml
+│   │   └── cluster.yml
 │   └── ha-example/                     # HA cluster example (3 master + HAProxy)
 │       ├── inventory/
 │       │   ├── hosts.yml
 │       │   └── group_vars/
-│       └── customer.yml
+│       └── cluster.yml
 ├── playbooks/
 │   ├── install.yml                     # Fresh cluster install
 │   ├── upgrade.yml                     # Rolling upgrade
@@ -298,10 +298,10 @@ All defaults are in `defaults/rke2_defaults.yml`. Override per-environment in `g
 | `rke2_upgrade_agent_serial` | `25%` | Worker upgrade batch percentage |
 | `rke2_reboot_after_uninstall` | `false` | Reboot nodes after uninstall |
 
-## Adding a New Customer/Environment
+## Adding a New Cluster
 
 ```bash
-cp -r environments/example environments/my-customer
+cp -r environments/example environments/my-cluster
 # Edit hosts, IPs, and overrides
 ```
 
