@@ -35,5 +35,6 @@ build_ignore:
   - .github
   - .ansible-lint
   - environments
+  - docs
   - kubeconfig.yaml
   - "*.tar.gz"
