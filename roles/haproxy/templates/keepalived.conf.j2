@@ -1,0 +1,45 @@
+! {{ ansible_managed }}
+! Keepalived configuration for RKE2 HA
+
+global_defs {
+    enable_script_security
+    script_user root
+}
+
+vrrp_script check_apiserver {
+    script "{{ keepalived_check_script_path }}"
+    interval {{ keepalived_check_interval }}
+    weight {{ keepalived_check_weight }}
+    fall {{ keepalived_check_fall }}
+    rise {{ keepalived_check_rise }}
+}
+
+vrrp_instance RKE2_VIP {
+    state {{ 'MASTER' if inventory_hostname == groups['loadbalancers'][0] else 'BACKUP' }}
+    interface {{ keepalived_vrrp_interface }}
+    virtual_router_id {{ keepalived_vrrp_id }}
+    priority {{ 101 - groups['loadbalancers'].index(inventory_hostname) }}
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ keepalived_auth_pass }}
+    }
+
+    unicast_src_ip {{ ansible_host }}
+    unicast_peer {
+{% for host in groups['loadbalancers'] %}
+{% if hostvars[host]['ansible_host'] != ansible_host %}
+        {{ hostvars[host]['ansible_host'] }}
+{% endif %}
+{% endfor %}
+    }
+
+    virtual_ipaddress {
+        {{ rke2_lb_vip }}/32
+    }
+
+    track_script {
+        check_apiserver
+    }
+}

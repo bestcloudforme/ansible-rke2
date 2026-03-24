@@ -1,0 +1,4 @@
+---
+rke2_server_token: ""
+rke2_bootstrap: false
+rke2_kubeconfig_mode: "0640"

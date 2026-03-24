@@ -1,0 +1,4 @@
+---
+keepalived_vrrp_interface: "eth0"
+keepalived_auth_pass: "ch4ng3m3"     # MUST change - max 8 chars
+haproxy_stats_password: "ch4ng3m3!"  # MUST change

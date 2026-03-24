@@ -1,0 +1,92 @@
+---
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+  - type: input
+    id: ansible-version
+    attributes:
+      label: Ansible Version
+      placeholder: "e.g., 2.16.3"
+    validations:
+      required: true
+
+  - type: input
+    id: rke2-version
+    attributes:
+      label: RKE2 Version
+      placeholder: "e.g., v1.32.2+rke2r1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Target OS
+      options:
+        - RHEL 8
+        - RHEL 9
+        - Rocky Linux 8
+        - Rocky Linux 9
+        - AlmaLinux 8
+        - AlmaLinux 9
+        - Ubuntu 20.04
+        - Ubuntu 22.04
+        - Ubuntu 24.04
+        - Debian 11
+        - Debian 12
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topology
+    attributes:
+      label: Cluster Topology
+      options:
+        - Single master
+        - HA (3 masters) with HAProxy
+        - HA (3 masters) with kube-vip
+        - HA (3 masters) with external LB
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Configure inventory with ...
+        2. Run `ansible-playbook playbooks/install.yml -i ...`
+        3. See error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any relevant log output (use `-vvv` for verbose).
+      render: text

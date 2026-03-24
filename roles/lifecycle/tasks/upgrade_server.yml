@@ -1,0 +1,96 @@
+---
+- name: Set delegate host for multi-master operations
+  ansible.builtin.set_fact:
+    _other_master: >-
+      {{ (groups['masters'] | reject('equalto', inventory_hostname) | list)[0]
+         if (groups['masters'] | length > 1)
+         else inventory_hostname }}
+
+- name: Drain master node before upgrade
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      drain {{ ansible_hostname | lower }}
+      --ignore-daemonsets
+      --delete-emptydir-data
+      --timeout={{ rke2_drain_timeout }}
+  delegate_to: "{{ _other_master }}"
+  when: groups['masters'] | length > 1
+  changed_when: true
+
+- name: Stop rke2-server
+  ansible.builtin.systemd:
+    name: rke2-server
+    state: stopped
+
+- name: Download RKE2 install script
+  ansible.builtin.get_url:
+    url: https://get.rke2.io
+    dest: /tmp/rke2-install.sh
+    mode: '0755'
+  when: not (rke2_airgap | default(false) | bool)
+
+- name: Upgrade RKE2 server (online)
+  ansible.builtin.command:
+    cmd: /tmp/rke2-install.sh
+  environment:
+    INSTALL_RKE2_VERSION: "{{ rke2_version }}"
+    INSTALL_RKE2_TYPE: "server"
+    INSTALL_RKE2_CHANNEL: "{{ rke2_channel }}"
+  when: not (rke2_airgap | default(false) | bool)
+  changed_when: true
+
+- name: Copy RKE2 install script from airgap artifacts
+  ansible.builtin.copy:
+    src: "{{ rke2_airgap_images_path }}/install.sh"
+    dest: /tmp/rke2-install.sh
+    mode: '0755'
+    remote_src: true
+  when: rke2_airgap | default(false) | bool
+
+- name: Upgrade RKE2 server (airgap)
+  ansible.builtin.command:
+    cmd: /tmp/rke2-install.sh
+  environment:
+    INSTALL_RKE2_VERSION: "{{ rke2_version }}"
+    INSTALL_RKE2_TYPE: "server"
+    INSTALL_RKE2_ARTIFACT_PATH: "{{ rke2_airgap_images_path }}"
+  when: rke2_airgap | default(false) | bool
+  changed_when: true
+
+- name: Start rke2-server
+  ansible.builtin.systemd:
+    name: rke2-server
+    state: started
+
+- name: Wait for Kubernetes API to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 6443
+    delay: 10
+    timeout: 300
+
+- name: Wait for node to be Ready
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      get node {{ ansible_hostname | lower }}
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  register: node_ready
+  until: node_ready.stdout == "True"
+  retries: 30
+  delay: 10
+  changed_when: false
+  delegate_to: "{{ _other_master }}"
+
+- name: Uncordon master node after upgrade
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      uncordon {{ ansible_hostname | lower }}
+  delegate_to: "{{ _other_master }}"
+  when: groups['masters'] | length > 1
+  changed_when: true

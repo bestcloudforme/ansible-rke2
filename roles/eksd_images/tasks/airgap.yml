@@ -1,0 +1,24 @@
+---
+- name: Verify EKS-D images tarball exists
+  ansible.builtin.stat:
+    path: "{{ rke2_airgap_images_path }}/eks-distro-images.tar"
+  register: eksd_tarball
+
+- name: Fail if EKS-D tarball is missing
+  ansible.builtin.assert:
+    that:
+      - eksd_tarball.stat.exists
+    fail_msg: "EKS-D images tarball not found at {{ rke2_airgap_images_path }}/eks-distro-images.tar"
+
+- name: Create RKE2 agent images directory
+  ansible.builtin.file:
+    path: "{{ rke2_data_dir }}/agent/images"
+    state: directory
+    mode: '0755'
+
+- name: Copy EKS-D images to RKE2 agent directory
+  ansible.builtin.copy:
+    src: "{{ rke2_airgap_images_path }}/eks-distro-images.tar"
+    dest: "{{ rke2_data_dir }}/agent/images/eks-distro-images.tar"
+    mode: '0644'
+    remote_src: true

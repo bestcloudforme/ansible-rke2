@@ -1,0 +1,153 @@
+---
+# Usage:
+#   # Restore from local snapshot:
+#   ansible-playbook playbooks/etcd_restore.yml \
+#     -i environments/my-cluster/inventory/hosts.yml \
+#     -e "rke2_etcd_restore_snapshot=/var/lib/rancher/rke2/server/db/snapshots/my-snapshot"
+#
+#   # Restore from S3 snapshot (configure S3 vars in group_vars):
+#   ansible-playbook playbooks/etcd_restore.yml \
+#     -i environments/my-cluster/inventory/hosts.yml \
+#     -e "rke2_etcd_restore_snapshot=my-snapshot-name"
+#
+#   WARNING: This will stop all masters, restore etcd, and rejoin.
+#   Ensure you have a valid backup before proceeding.
+
+- name: "Validate restore parameters"
+  hosts: masters[0]
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Validate snapshot name is provided
+      ansible.builtin.assert:
+        that:
+          - rke2_etcd_restore_snapshot | default('') | length > 0
+        fail_msg: >-
+          rke2_etcd_restore_snapshot must be set.
+          Use -e "rke2_etcd_restore_snapshot=<snapshot-name>" to specify.
+
+- name: "Stop ALL masters before restore"
+  hosts: masters
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Stop rke2-server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: stopped
+
+- name: "Restore etcd on bootstrap master"
+  hosts: masters[0]
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Build etcd restore command
+      ansible.builtin.set_fact:
+        _etcd_restore_cmd: >-
+          {{ rke2_bin_dir }}/rke2 server
+          --cluster-reset
+          --cluster-reset-restore-path={{ rke2_etcd_restore_snapshot }}
+          --data-dir {{ rke2_data_dir }}
+          {% if rke2_etcd_s3_enabled | default(false) | bool %}
+          --etcd-s3
+          --etcd-s3-bucket {{ rke2_etcd_s3_bucket }}
+          {% if rke2_etcd_s3_endpoint | default('') | length > 0 %}
+          --etcd-s3-endpoint {{ rke2_etcd_s3_endpoint }}
+          {% endif %}
+          {% if rke2_etcd_s3_region | default('') | length > 0 %}
+          --etcd-s3-region {{ rke2_etcd_s3_region }}
+          {% endif %}
+          {% if rke2_etcd_s3_access_key | default('') | length > 0 %}
+          --etcd-s3-access-key {{ rke2_etcd_s3_access_key }}
+          --etcd-s3-secret-key {{ rke2_etcd_s3_secret_key }}
+          {% endif %}
+          {% if rke2_etcd_s3_folder | default('') | length > 0 %}
+          --etcd-s3-folder {{ rke2_etcd_s3_folder }}
+          {% endif %}
+          {% if rke2_etcd_s3_skip_ssl_verify | default(false) | bool %}
+          --etcd-s3-skip-ssl-verify
+          {% endif %}
+          {% endif %}
+      no_log: true
+
+    - name: Restore etcd snapshot
+      ansible.builtin.command:
+        cmd: "{{ _etcd_restore_cmd }}"
+      changed_when: true
+      async: 300
+      poll: 10
+      no_log: true
+
+    - name: Remove cluster-reset flag file
+      ansible.builtin.file:
+        path: "{{ rke2_data_dir }}/server/db/reset-flag"
+        state: absent
+
+    - name: Start rke2-server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+
+    - name: Wait for API to be ready
+      ansible.builtin.wait_for:
+        host: localhost
+        port: 6443
+        delay: 10
+        timeout: 300
+
+- name: "Rejoin other masters"
+  hosts: masters[1:]
+  become: true
+  serial: 1
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Remove old etcd data
+      ansible.builtin.file:
+        path: "{{ rke2_data_dir }}/server/db"
+        state: absent
+
+    - name: Start rke2-server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+
+    - name: Wait for node to be Ready
+      ansible.builtin.command:
+        cmd: >
+          {{ rke2_bin_dir }}/kubectl
+          --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+          get node {{ ansible_hostname | lower }}
+          -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+      register: node_ready
+      until: node_ready.stdout == "True"
+      retries: 30
+      delay: 10
+      changed_when: false
+      delegate_to: "{{ groups['masters'][0] }}"
+
+- name: "Verify restore"
+  hosts: masters[0]
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Wait for all masters to be Ready
+      ansible.builtin.command:
+        cmd: >
+          {{ rke2_bin_dir }}/kubectl
+          --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+          get nodes -l node-role.kubernetes.io/control-plane
+          -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}'
+      register: masters_ready
+      until: "'False' not in masters_ready.stdout and masters_ready.stdout | length > 0"
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Restore complete
+      ansible.builtin.debug:
+        msg: "etcd restore from '{{ rke2_etcd_restore_snapshot }}' completed. All masters are Ready."

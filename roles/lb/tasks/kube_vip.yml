@@ -1,0 +1,18 @@
+---
+- name: Validate VIP is configured
+  ansible.builtin.assert:
+    that:
+      - rke2_lb_vip | default('') | length > 0
+    fail_msg: "rke2_lb_vip must be set when using kube-vip"
+
+- name: Create RKE2 manifests directory
+  ansible.builtin.file:
+    path: "{{ rke2_data_dir }}/server/manifests"
+    state: directory
+    mode: '0700'
+
+- name: Deploy kube-vip DaemonSet manifest
+  ansible.builtin.template:
+    src: kube-vip.yaml.j2
+    dest: "{{ rke2_data_dir }}/server/manifests/kube-vip.yaml"
+    mode: '0600'

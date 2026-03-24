@@ -1,0 +1,7 @@
+---
+- name: Configure private registry mirror for EKS-D images
+  ansible.builtin.template:
+    src: registries.yaml.j2
+    dest: "{{ rke2_config_dir }}/registries.yaml"
+    mode: '0600'
+  when: rke2_registry_mirror | default('') | length > 0

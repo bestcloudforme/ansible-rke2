@@ -1,0 +1,26 @@
+---
+- name: Restart rke2-agent to pick up rotated certificates
+  ansible.builtin.systemd:
+    name: rke2-agent
+    state: restarted
+
+- name: Wait for kubelet port
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 10250
+    delay: 10
+    timeout: 120
+
+- name: Verify node is Ready
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      get node {{ ansible_hostname | lower }}
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  register: node_ready
+  until: node_ready.stdout == "True"
+  retries: 30
+  delay: 10
+  changed_when: false
+  delegate_to: "{{ groups['masters'][0] }}"

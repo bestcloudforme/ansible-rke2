@@ -1,0 +1,17 @@
+---
+- name: Verify supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family in ['RedHat', 'Debian']
+    fail_msg: "Unsupported OS family: {{ ansible_os_family }}. Supported: RedHat, Debian"
+
+- name: Run common prerequisites
+  ansible.builtin.include_tasks: common.yml
+
+- name: Run RHEL-specific prerequisites
+  ansible.builtin.include_tasks: rhel.yml
+  when: ansible_os_family == "RedHat"
+
+- name: Run Debian-specific prerequisites
+  ansible.builtin.include_tasks: debian.yml
+  when: ansible_os_family == "Debian"

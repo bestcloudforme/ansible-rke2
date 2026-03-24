@@ -1,0 +1,36 @@
+---
+- name: Enable and start rke2-server
+  ansible.builtin.systemd:
+    name: rke2-server
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Wait for Kubernetes API to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 6443
+    delay: 10
+    timeout: 300
+
+- name: Read bootstrap token
+  ansible.builtin.slurp:
+    src: "{{ rke2_data_dir }}/server/node-token"
+  register: rke2_node_token
+  no_log: true
+  when: rke2_bootstrap | default(false)
+
+- name: Create /root/.kube directory
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    mode: '0700'
+  when: rke2_bootstrap | default(false)
+
+- name: Create kubeconfig symlink
+  ansible.builtin.file:
+    src: "{{ rke2_config_dir }}/rke2.yaml"
+    dest: /root/.kube/config
+    state: link
+    force: true
+  when: rke2_bootstrap | default(false)

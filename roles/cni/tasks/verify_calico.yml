@@ -1,0 +1,13 @@
+---
+- name: Wait for all Calico pods to be Ready
+  ansible.builtin.shell:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      get pods -n kube-system -l k8s-app=calico-node
+      -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
+      | grep -v '^True$' | grep -c . || true
+  register: calico_not_ready
+  until: calico_not_ready.stdout | int == 0
+  retries: 20
+  delay: 15
+  changed_when: false

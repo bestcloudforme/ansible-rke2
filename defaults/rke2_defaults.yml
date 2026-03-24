@@ -1,0 +1,118 @@
+---
+# =============================================================================
+# RKE2 Global Defaults
+# =============================================================================
+# This is the single source of truth for all default variables.
+# Override per-environment in environments/<env>/inventory/group_vars/
+
+# -----------------------------------------------------------------------------
+# RKE2 Core
+# -----------------------------------------------------------------------------
+rke2_version: ""            # REQUIRED - e.g. "v1.32.2+rke2r1"
+rke2_channel: "stable"
+rke2_cni: "canal"           # canal, calico, or cilium
+rke2_cilium_kube_proxy_replacement: true   # Replace kube-proxy with Cilium eBPF (when cni=cilium)
+rke2_cilium_bpf_masquerade: true           # Use BPF masquerading instead of iptables (when cni=cilium)
+rke2_master_count: 1        # 1 for single-master, 3 for HA
+rke2_cluster_cidr: "10.42.0.0/16"
+rke2_service_cidr: "10.43.0.0/16"
+
+# Custom manifests (auto-deployed by RKE2 on server start)
+rke2_custom_manifests: []         # List of local paths to YAML manifests to deploy
+
+# -----------------------------------------------------------------------------
+# Airgap Installation
+# -----------------------------------------------------------------------------
+rke2_airgap: false
+rke2_airgap_images_path: "/opt/rke2-artifacts"
+rke2_registry_mirror: ""
+rke2_registry_mirror_tls_skip: false  # Skip TLS verification for registry mirror
+
+# -----------------------------------------------------------------------------
+# EKS Distro (optional image override)
+# -----------------------------------------------------------------------------
+eksd_enabled: false
+eksd_version: "1-32-eks-1"
+eksd_registry: "public.ecr.aws/eks-distro"
+
+# -----------------------------------------------------------------------------
+# Paths
+# -----------------------------------------------------------------------------
+rke2_data_dir: "/var/lib/rancher/rke2"
+rke2_config_dir: "/etc/rancher/rke2"
+rke2_bin_dir: "/var/lib/rancher/rke2/bin"
+
+# -----------------------------------------------------------------------------
+# Load Balancer
+# Supported types: kube-vip, external, haproxy
+# - kube-vip:  deploys kube-vip DaemonSet on control-plane nodes
+# - external:  assumes an external LB is already configured
+# - haproxy:   deploys HAProxy + keepalived on dedicated LB nodes
+# -----------------------------------------------------------------------------
+rke2_lb_type: "external"    # kube-vip, external, or haproxy
+rke2_lb_vip: ""             # Virtual IP (required for kube-vip/haproxy)
+rke2_lb_external_host: ""   # External LB hostname/IP (required for external)
+rke2_vip_interface: "eth0"  # Network interface for VIP
+rke2_server_tls_san: []     # Additional TLS SANs for API server cert
+rke2_kube_vip_version: "v0.8.7"
+
+# HAProxy + Keepalived defaults are in roles/haproxy/defaults/main.yml
+# Override per-environment in group_vars/loadbalancers.yml
+
+# -----------------------------------------------------------------------------
+# Lifecycle Management
+# -----------------------------------------------------------------------------
+rke2_drain_timeout: "300s"
+rke2_upgrade_serial: 1
+rke2_upgrade_agent_serial: "25%"
+rke2_reboot_after_uninstall: false
+
+# -----------------------------------------------------------------------------
+# Production Hardening (empty/false = disabled)
+# Enable these for production deployments
+# -----------------------------------------------------------------------------
+
+# etcd snapshots
+rke2_etcd_snapshot_schedule: ""     # cron format, e.g. "0 */6 * * *"
+rke2_etcd_snapshot_retention: 5
+rke2_etcd_snapshot_dir: "{{ rke2_data_dir }}/server/db/snapshots"
+
+# Audit logging
+rke2_audit_policy_enabled: false
+rke2_audit_log_maxage: 30
+rke2_audit_log_maxbackup: 10
+rke2_audit_log_maxsize: 100
+
+# Pod Security Admission (restricted, baseline, privileged, or empty)
+rke2_pod_security_admission: ""
+
+# kubelet resource reservations
+rke2_kube_reserved_cpu: ""          # e.g. "500m"
+rke2_kube_reserved_memory: ""       # e.g. "512Mi"
+rke2_system_reserved_cpu: ""        # e.g. "500m"
+rke2_system_reserved_memory: ""     # e.g. "512Mi"
+
+# kubelet eviction thresholds (applied independently of reservations)
+rke2_eviction_hard: ""              # e.g. "memory.available<256Mi,nodefs.available<10%"
+
+# etcd S3 backup (optional - leave empty to use local snapshots only)
+rke2_etcd_s3_enabled: false
+rke2_etcd_s3_endpoint: ""              # e.g. "s3.amazonaws.com" or minio endpoint
+rke2_etcd_s3_bucket: ""
+rke2_etcd_s3_region: ""                # e.g. "us-east-1"
+rke2_etcd_s3_access_key: ""
+rke2_etcd_s3_secret_key: ""
+rke2_etcd_s3_folder: ""                # prefix/folder inside bucket
+rke2_etcd_s3_skip_ssl_verify: false
+
+# CIS/STIG Hardening Profile
+rke2_cis_profile: ""                   # "cis" or "cis-1.23" (empty = disabled)
+
+# Kernel hardening
+rke2_protect_kernel_defaults: false
+
+# Node scheduling
+rke2_server_node_taints: []         # e.g. ["node-role.kubernetes.io/control-plane:NoSchedule"]
+rke2_server_node_labels: []         # e.g. ["node-role.kubernetes.io/control-plane=true"]
+rke2_agent_node_labels: []          # e.g. ["node-role.kubernetes.io/worker=true"]
+rke2_agent_node_taints: []

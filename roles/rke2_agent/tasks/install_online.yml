@@ -1,0 +1,21 @@
+---
+- name: Check if RKE2 agent is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/rke2
+  register: rke2_binary
+
+- name: Download RKE2 install script
+  ansible.builtin.get_url:
+    url: https://get.rke2.io
+    dest: /tmp/rke2-install.sh
+    mode: '0755'
+  when: not rke2_binary.stat.exists
+
+- name: Install RKE2 agent
+  ansible.builtin.command:
+    cmd: /tmp/rke2-install.sh
+    creates: /usr/local/bin/rke2
+  environment:
+    INSTALL_RKE2_VERSION: "{{ rke2_version }}"
+    INSTALL_RKE2_TYPE: "agent"
+    INSTALL_RKE2_CHANNEL: "{{ rke2_channel }}"

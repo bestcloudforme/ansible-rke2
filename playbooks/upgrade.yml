@@ -1,0 +1,61 @@
+---
+- name: "Preflight: version check"
+  hosts: masters,workers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Check current RKE2 version
+      ansible.builtin.command:
+        cmd: /usr/local/bin/rke2 --version
+      register: current_version
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show upgrade plan
+      ansible.builtin.debug:
+        msg: "Current: {{ current_version.stdout | default('not installed') }} -> Target: {{ rke2_version }}"
+
+- name: "Re-template HAProxy config"
+  hosts: loadbalancers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Update HAProxy configuration
+      ansible.builtin.template:
+        src: "../roles/haproxy/templates/haproxy.cfg.j2"
+        dest: /etc/haproxy/haproxy.cfg
+        mode: '0644'
+        validate: haproxy -c -f %s
+      notify: Reload haproxy
+      when: rke2_lb_type | default('external') == 'haproxy'
+      no_log: true
+      diff: false
+  handlers:
+    - name: Reload haproxy
+      ansible.builtin.systemd:
+        name: haproxy
+        state: reloaded
+
+- name: "Upgrade masters (serial: {{ rke2_upgrade_serial | default(1) }})"
+  hosts: masters
+  become: true
+  serial: "{{ rke2_upgrade_serial }}"
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: upgrade_server
+
+- name: "Upgrade workers (serial: {{ rke2_upgrade_agent_serial | default('25%') }})"
+  hosts: workers
+  become: true
+  serial: "{{ rke2_upgrade_agent_serial }}"
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: upgrade_agent

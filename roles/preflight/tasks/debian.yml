@@ -1,0 +1,45 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install required packages (Debian)
+  ansible.builtin.apt:
+    name:
+      - curl
+      - tar
+      - iptables
+      - conntrack
+      - socat
+      - ipset
+      - apt-transport-https
+    state: present
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Configure ufw firewall rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] }}"
+  loop:
+    - 6443/tcp    # Kubernetes API
+    - 9345/tcp    # RKE2 supervisor
+    - 2379/tcp    # etcd client
+    - 2380/tcp    # etcd peer
+    - 8472/udp    # VXLAN (Canal/Flannel)
+    - 10250/tcp   # kubelet
+    - 10255/tcp   # kubelet read-only
+    - 179/tcp     # BGP (Calico)
+  register: ufw_result
+  when: ansible_facts.services['ufw.service'] is defined
+  ignore_errors: true
+
+- name: Warn if ufw port opening failed
+  ansible.builtin.debug:
+    msg: "WARNING: Could not open some ufw ports. Check firewall configuration manually."
+  when:
+    - ansible_facts.services['ufw.service'] is defined
+    - ufw_result.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0

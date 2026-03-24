@@ -1,0 +1,37 @@
+---
+- name: Create HAProxy config directory
+  ansible.builtin.file:
+    path: /etc/haproxy
+    state: directory
+    mode: '0755'
+
+- name: Deploy HAProxy configuration
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    mode: '0644'
+    validate: haproxy -c -f %s
+  notify: Restart haproxy
+  no_log: true
+  diff: false
+
+- name: Deploy API server health check script
+  ansible.builtin.template:
+    src: check_apiserver.sh.j2
+    dest: "{{ keepalived_check_script_path }}"
+    mode: '0755'
+
+- name: Create Keepalived config directory
+  ansible.builtin.file:
+    path: /etc/keepalived
+    state: directory
+    mode: '0755'
+
+- name: Deploy Keepalived configuration
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0644'
+  notify: Restart keepalived
+  no_log: true
+  diff: false

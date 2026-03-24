@@ -1,0 +1,39 @@
+---
+# RKE2 HA cluster configuration
+rke2_version: "v1.32.2+rke2r1"
+rke2_cni: "cilium"
+rke2_master_count: 3
+
+# Load balancer - HAProxy with keepalived VIP
+rke2_lb_type: "haproxy"
+rke2_lb_vip: "192.168.1.100"
+rke2_lb_external_host: "192.168.1.100"
+rke2_vip_interface: "eth0"
+
+# TLS SANs - VIP and all master IPs
+rke2_server_tls_san:
+  - "192.168.1.100"
+  - "192.168.1.10"
+  - "192.168.1.11"
+  - "192.168.1.12"
+
+# Installation mode
+rke2_airgap: false
+eksd_enabled: false
+
+# Production hardening
+rke2_etcd_snapshot_schedule: "0 */6 * * *"
+rke2_etcd_snapshot_retention: 10
+rke2_audit_policy_enabled: true
+rke2_pod_security_admission: "restricted"
+rke2_kube_reserved_cpu: "500m"
+rke2_kube_reserved_memory: "512Mi"
+rke2_system_reserved_cpu: "500m"
+rke2_system_reserved_memory: "512Mi"
+rke2_eviction_hard: "memory.available<256Mi,nodefs.available<10%"
+rke2_protect_kernel_defaults: true
+
+# SSH connection
+ansible_user: your_user
+ansible_become: true
+ansible_become_method: sudo

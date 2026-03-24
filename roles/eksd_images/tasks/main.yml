@@ -1,0 +1,8 @@
+---
+- name: Configure EKS-D images (online)
+  ansible.builtin.include_tasks: online.yml
+  when: not (rke2_airgap | default(false) | bool)
+
+- name: Configure EKS-D images (airgap)
+  ansible.builtin.include_tasks: airgap.yml
+  when: rke2_airgap | default(false) | bool

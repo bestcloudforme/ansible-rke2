@@ -1,0 +1,46 @@
+---
+- name: Validate HAProxy prerequisites
+  ansible.builtin.assert:
+    that:
+      - rke2_lb_vip | length > 0
+      - groups['masters'] | length >= 1
+      - groups['loadbalancers'] | length >= 2
+      - keepalived_auth_pass | length <= 8
+      - keepalived_auth_pass | length > 0
+      - haproxy_stats_password != "changeme"
+      - keepalived_auth_pass != "rke2ha"
+    fail_msg: >
+      HAProxy requires: rke2_lb_vip must be set,
+      at least 1 master and 2 loadbalancer nodes,
+      keepalived_auth_pass must be 1-8 characters and changed from default,
+      haproxy_stats_password must be changed from default.
+
+- name: Install HAProxy and Keepalived
+  ansible.builtin.include_tasks: install.yml
+
+- name: Configure HAProxy and Keepalived
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Enable and start services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - haproxy
+    - keepalived
+
+- name: Wait for HAProxy to listen on API port
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ haproxy_api_frontend_port }}"
+    delay: 5
+    timeout: 60
+
+- name: Wait for HAProxy to listen on join port
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ haproxy_join_frontend_port }}"
+    delay: 2
+    timeout: 30

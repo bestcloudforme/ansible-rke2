@@ -1,0 +1,23 @@
+---
+# HAProxy
+haproxy_stats_bind: "127.0.0.1"
+haproxy_stats_port: 9000
+haproxy_stats_user: "admin"
+haproxy_stats_password: "changeme"
+haproxy_api_frontend_port: 6443
+haproxy_join_frontend_port: 9345
+haproxy_balance_algorithm: "roundrobin"
+haproxy_check_interval: "3s"
+haproxy_check_fall: 3
+haproxy_check_rise: 2
+haproxy_maxconn: 3000
+
+# Keepalived
+keepalived_vrrp_interface: "{{ rke2_vip_interface | default('eth0') }}"
+keepalived_vrrp_id: 51
+keepalived_auth_pass: "rke2ha"
+keepalived_check_script_path: "/usr/local/bin/check_apiserver.sh"
+keepalived_check_interval: 3
+keepalived_check_weight: -2
+keepalived_check_fall: 3
+keepalived_check_rise: 2

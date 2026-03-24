@@ -1,0 +1,64 @@
+---
+# Usage:
+#   Worker:  ansible-playbook add_node.yml -e "target_hosts=new_worker"
+#   Master:  ansible-playbook add_node.yml -e "target_hosts=new_master node_role=master"
+
+- name: "Validate parameters"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Check target_hosts is defined
+      ansible.builtin.assert:
+        that:
+          - target_hosts is defined
+          - target_hosts | length > 0
+        fail_msg: "Required: -e 'target_hosts=hostname'"
+
+- name: "Fetch token from bootstrap master"
+  hosts: "{{ groups['masters'][0] }}"
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Read cluster join token
+      ansible.builtin.slurp:
+        src: "{{ rke2_data_dir }}/server/node-token"
+      register: rke2_node_token
+      no_log: true
+
+- name: "Preflight on new node"
+  hosts: "{{ target_hosts }}"
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: preflight
+
+- name: "Join new worker node"
+  hosts: "{{ target_hosts }}"
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_agent
+      when: (node_role | default('worker')) == 'worker'
+
+- name: "Join new master node"
+  hosts: "{{ target_hosts }}"
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_server
+      when: (node_role | default('worker')) == 'master'
+
+- name: "Update HAProxy backends"
+  hosts: loadbalancers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: haproxy
+      when:
+        - rke2_lb_type | default('external') == 'haproxy'
+        - (node_role | default('worker')) == 'master'

@@ -1,0 +1,110 @@
+{# RKE2 Server Configuration #}
+---
+{% if rke2_bootstrap | default(false) and rke2_master_count | int > 1 %}
+cluster-init: true
+{% elif not (rke2_bootstrap | default(false)) %}
+server: https://{{ rke2_lb_vip if (rke2_lb_type in ['kube-vip', 'haproxy'] and rke2_lb_vip | default('') | length > 0) else rke2_lb_external_host }}:9345
+token: {{ rke2_server_token }}
+{% endif %}
+{% if rke2_bootstrap | default(false) and rke2_server_token | default('') | length > 0 %}
+token: {{ rke2_server_token }}
+{% endif %}
+
+{% set all_sans = rke2_server_tls_san | default([]) %}
+{% if rke2_lb_vip | default('') | length > 0 and rke2_lb_vip not in all_sans %}
+{%   set all_sans = all_sans + [rke2_lb_vip] %}
+{% endif %}
+{% if all_sans | length > 0 %}
+tls-san:
+{% for san in all_sans %}
+  - {{ san }}
+{% endfor %}
+{% endif %}
+
+cni: {{ rke2_cni }}
+{% if rke2_cni == 'cilium' and rke2_cilium_kube_proxy_replacement | default(true) | bool %}
+
+disable:
+  - rke2-kube-proxy
+{% endif %}
+
+cluster-cidr: {{ rke2_cluster_cidr }}
+service-cidr: {{ rke2_service_cidr }}
+
+data-dir: {{ rke2_data_dir }}
+
+write-kubeconfig-mode: "{{ rke2_kubeconfig_mode | default('0640') }}"
+
+{% if rke2_cis_profile | default('') | length > 0 %}
+profile: {{ rke2_cis_profile }}
+{% endif %}
+
+{% if rke2_registry_mirror | default('') | length > 0 %}
+system-default-registry: {{ rke2_registry_mirror }}
+{% endif %}
+
+{% if rke2_protect_kernel_defaults | default(false) %}
+protect-kernel-defaults: true
+{% endif %}
+
+{# etcd snapshots #}
+{% if rke2_etcd_snapshot_schedule | default('') | length > 0 %}
+etcd-snapshot-schedule-cron: "{{ rke2_etcd_snapshot_schedule }}"
+etcd-snapshot-retention: {{ rke2_etcd_snapshot_retention }}
+etcd-snapshot-dir: {{ rke2_etcd_snapshot_dir }}
+{% endif %}
+
+{# kube-apiserver args #}
+{% set apiserver_args = [] %}
+{% if rke2_audit_policy_enabled | default(false) %}
+{% set _ = apiserver_args.extend([
+  'audit-log-path=/var/log/kubernetes/audit/audit.log',
+  'audit-log-maxage=' ~ rke2_audit_log_maxage | default(30),
+  'audit-log-maxbackup=' ~ rke2_audit_log_maxbackup | default(10),
+  'audit-log-maxsize=' ~ rke2_audit_log_maxsize | default(100),
+  'audit-policy-file=' ~ rke2_config_dir ~ '/audit-policy.yaml'
+]) %}
+{% endif %}
+{% if rke2_pod_security_admission | default('') | length > 0 %}
+{% set _ = apiserver_args.append('admission-control-config-file=' ~ rke2_config_dir ~ '/psa-config.yaml') %}
+{% endif %}
+{% if apiserver_args | length > 0 %}
+kube-apiserver-arg:
+{% for arg in apiserver_args %}
+  - "{{ arg }}"
+{% endfor %}
+{% endif %}
+
+{# kubelet args (resource reservations + eviction) #}
+{% set kubelet_args = [] %}
+{% if rke2_kube_reserved_cpu | default('') | length > 0 and rke2_kube_reserved_memory | default('') | length > 0 %}
+{%   set _ = kubelet_args.append("kube-reserved=cpu=" ~ rke2_kube_reserved_cpu ~ ",memory=" ~ rke2_kube_reserved_memory) %}
+{% endif %}
+{% if rke2_system_reserved_cpu | default('') | length > 0 and rke2_system_reserved_memory | default('') | length > 0 %}
+{%   set _ = kubelet_args.append("system-reserved=cpu=" ~ rke2_system_reserved_cpu ~ ",memory=" ~ rke2_system_reserved_memory) %}
+{% endif %}
+{% if rke2_eviction_hard | default('') | length > 0 %}
+{%   set _ = kubelet_args.append("eviction-hard=" ~ rke2_eviction_hard) %}
+{% endif %}
+{% if kubelet_args | length > 0 %}
+kubelet-arg:
+{% for arg in kubelet_args %}
+  - "{{ arg }}"
+{% endfor %}
+{% endif %}
+
+{# Node taints #}
+{% if rke2_server_node_taints | default([]) | length > 0 %}
+node-taint:
+{% for taint in rke2_server_node_taints %}
+  - {{ taint }}
+{% endfor %}
+{% endif %}
+
+{# Node labels #}
+{% if rke2_server_node_labels | default([]) | length > 0 %}
+node-label:
+{% for label in rke2_server_node_labels %}
+  - {{ label }}
+{% endfor %}
+{% endif %}

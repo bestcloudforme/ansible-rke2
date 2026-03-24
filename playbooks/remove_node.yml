@@ -1,0 +1,28 @@
+---
+# Usage:
+#   Worker:  ansible-playbook remove_node.yml -e "node_name=worker-3"
+#   Master:  ansible-playbook remove_node.yml -e "node_name=master-2 node_role=master"
+#
+# If the Kubernetes node name differs from the Ansible inventory hostname:
+#   ansible-playbook remove_node.yml -e "node_name=k8s-worker-3 target_host=worker-3.example.com"
+
+- name: "Remove node from cluster"
+  hosts: masters[0]
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: remove_node
+
+- name: "Update HAProxy backends after master removal"
+  hosts: loadbalancers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: haproxy
+      when:
+        - rke2_lb_type | default('external') == 'haproxy'
+        - (node_role | default('worker')) == 'master'

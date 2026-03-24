@@ -1,0 +1,46 @@
+---
+- name: Install required packages (RHEL)
+  ansible.builtin.dnf:
+    name:
+      - curl
+      - tar
+      - iptables
+      - conntrack-tools
+      - socat
+      - ipset
+    state: present
+
+- name: Set SELinux to permissive
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+  when: ansible_selinux.status | default('disabled') == 'enabled'
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Open firewalld ports for RKE2
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - 6443/tcp    # Kubernetes API
+    - 9345/tcp    # RKE2 supervisor
+    - 2379/tcp    # etcd client
+    - 2380/tcp    # etcd peer
+    - 8472/udp    # VXLAN (Canal/Flannel)
+    - 10250/tcp   # kubelet
+    - 10255/tcp   # kubelet read-only
+    - 179/tcp     # BGP (Calico)
+  register: firewalld_result
+  when: ansible_facts.services['firewalld.service'] is defined
+  ignore_errors: true
+
+- name: Warn if firewalld port opening failed
+  ansible.builtin.debug:
+    msg: "WARNING: Could not open some firewalld ports. Check firewall configuration manually."
+  when:
+    - ansible_facts.services['firewalld.service'] is defined
+    - firewalld_result.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0

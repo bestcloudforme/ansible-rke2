@@ -1,0 +1,32 @@
+---
+- name: Install HAProxy and Keepalived (RHEL)
+  ansible.builtin.dnf:
+    name:
+      - haproxy
+      - keepalived
+      - psmisc
+      - curl
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Install HAProxy and Keepalived (Debian)
+  ansible.builtin.apt:
+    name:
+      - haproxy
+      - keepalived
+      - psmisc
+      - curl
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Enable ip_nonlocal_bind for VIP
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-haproxy.conf
+    reload: true
+    state: present
+  loop:
+    - { key: "net.ipv4.ip_nonlocal_bind", value: "1" }
+    - { key: "net.ipv4.ip_forward", value: "1" }

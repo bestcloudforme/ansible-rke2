@@ -1,0 +1,58 @@
+---
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install yamllint ansible-core ansible-lint
+          ansible-galaxy collection install -r requirements.yml
+
+      - name: YAML Lint
+        run: yamllint .
+
+      - name: Ansible Lint
+        run: ansible-lint
+
+      - name: Syntax check - all playbooks (single master)
+        run: |
+          for pb in install upgrade remove_node uninstall \
+                    etcd_backup etcd_restore rotate_certs fetch_kubeconfig; do
+            echo "--- Checking playbooks/${pb}.yml ---"
+            ansible-playbook playbooks/${pb}.yml \
+              -i environments/example/inventory/hosts.yml \
+              --syntax-check
+          done
+
+      - name: Syntax check - all playbooks (HA cluster)
+        run: |
+          for pb in install upgrade remove_node uninstall \
+                    etcd_backup etcd_restore rotate_certs fetch_kubeconfig; do
+            echo "--- Checking playbooks/${pb}.yml ---"
+            ansible-playbook playbooks/${pb}.yml \
+              -i environments/ha-example/inventory/hosts.yml \
+              --syntax-check
+          done
+
+      - name: Syntax check - add_node (requires runtime variable)
+        run: |
+          ansible-playbook playbooks/add_node.yml \
+            -i environments/example/inventory/hosts.yml \
+            -e "target_hosts=workers" \
+            --syntax-check

@@ -1,0 +1,46 @@
+{# RKE2 Agent Configuration #}
+---
+server: https://{{ rke2_lb_vip if (rke2_lb_type in ['kube-vip', 'haproxy'] and rke2_lb_vip | default('') | length > 0) else rke2_lb_external_host }}:9345
+token: {{ rke2_server_token }}
+
+data-dir: {{ rke2_data_dir }}
+
+{% if rke2_cis_profile | default('') | length > 0 %}
+profile: {{ rke2_cis_profile }}
+{% endif %}
+
+{% if rke2_agent_node_labels | default([]) | length > 0 %}
+node-label:
+{% for label in rke2_agent_node_labels %}
+  - {{ label }}
+{% endfor %}
+{% endif %}
+
+{% if rke2_agent_node_taints | default([]) | length > 0 %}
+node-taint:
+{% for taint in rke2_agent_node_taints %}
+  - {{ taint }}
+{% endfor %}
+{% endif %}
+
+{% if rke2_registry_mirror | default('') | length > 0 %}
+system-default-registry: {{ rke2_registry_mirror }}
+{% endif %}
+
+{# kubelet args (resource reservations + eviction) #}
+{% set kubelet_args = [] %}
+{% if rke2_kube_reserved_cpu | default('') | length > 0 and rke2_kube_reserved_memory | default('') | length > 0 %}
+{%   set _ = kubelet_args.append("kube-reserved=cpu=" ~ rke2_kube_reserved_cpu ~ ",memory=" ~ rke2_kube_reserved_memory) %}
+{% endif %}
+{% if rke2_system_reserved_cpu | default('') | length > 0 and rke2_system_reserved_memory | default('') | length > 0 %}
+{%   set _ = kubelet_args.append("system-reserved=cpu=" ~ rke2_system_reserved_cpu ~ ",memory=" ~ rke2_system_reserved_memory) %}
+{% endif %}
+{% if rke2_eviction_hard | default('') | length > 0 %}
+{%   set _ = kubelet_args.append("eviction-hard=" ~ rke2_eviction_hard) %}
+{% endif %}
+{% if kubelet_args | length > 0 %}
+kubelet-arg:
+{% for arg in kubelet_args %}
+  - "{{ arg }}"
+{% endfor %}
+{% endif %}

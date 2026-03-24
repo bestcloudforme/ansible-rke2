@@ -1,0 +1,40 @@
+{# Kubernetes Audit Policy for RKE2 #}
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  # Do not log requests to these endpoints
+  - level: None
+    resources:
+      - group: ""
+        resources: ["endpoints", "services", "services/status"]
+  # Do not log kube-proxy watches
+  - level: None
+    users: ["system:kube-proxy"]
+    verbs: ["watch"]
+    resources:
+      - group: ""
+        resources: ["endpoints", "services", "services/status"]
+  # Do not log authenticated requests to API discovery
+  - level: None
+    userGroups: ["system:authenticated"]
+    nonResourceURLs: ["/api*", "/version"]
+  # Log configmap changes in kube-system at request level
+  - level: Request
+    resources:
+      - group: ""
+        resources: ["configmaps"]
+    namespaces: ["kube-system"]
+  # Log secrets and configmaps at metadata level
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+  # Log core, apps, and batch resources at request level
+  - level: Request
+    resources:
+      - group: ""
+      - group: "apps"
+      - group: "batch"
+  # Log everything else at metadata level
+  - level: Metadata
+    omitStages: ["RequestReceived"]

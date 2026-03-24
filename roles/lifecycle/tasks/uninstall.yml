@@ -1,0 +1,22 @@
+---
+- name: Run rke2-killall
+  ansible.builtin.command:
+    cmd: /usr/local/bin/rke2-killall.sh
+  ignore_errors: true
+  changed_when: true
+
+- name: Run rke2-uninstall
+  ansible.builtin.command:
+    cmd: /usr/local/bin/rke2-uninstall.sh
+  ignore_errors: true
+  changed_when: true
+
+- name: Remove RKE2 config directory
+  ansible.builtin.file:
+    path: "{{ rke2_config_dir }}"
+    state: absent
+
+- name: Reboot node after uninstall
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  when: rke2_reboot_after_uninstall | default(false) | bool

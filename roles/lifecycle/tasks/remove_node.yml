@@ -1,0 +1,61 @@
+---
+- name: Validate node_name is provided
+  ansible.builtin.assert:
+    that:
+      - node_name is defined
+      - node_name | length > 0
+    fail_msg: "Required: -e 'node_name=<node-hostname>'"
+
+- name: Set target host for remote cleanup
+  ansible.builtin.set_fact:
+    _remove_target: "{{ target_host | default(node_name) }}"
+
+- name: Validate target host exists in inventory
+  ansible.builtin.assert:
+    that:
+      - _remove_target in (groups['workers'] | default([])) + (groups['masters'] | default([]))
+    fail_msg: >-
+      Host '{{ _remove_target }}' not found in inventory.
+      If the Ansible inventory hostname differs from the Kubernetes node name,
+      pass both: -e "node_name=<k8s-name> target_host=<inventory-hostname>"
+
+- name: Cordon node
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      cordon {{ node_name }}
+  changed_when: true
+
+- name: Drain node
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      drain {{ node_name }}
+      --ignore-daemonsets
+      --delete-emptydir-data
+      --timeout={{ rke2_drain_timeout }}
+  changed_when: true
+
+- name: Delete node from cluster
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      delete node {{ node_name }}
+  changed_when: true
+
+- name: Run rke2-killall on removed node
+  ansible.builtin.command:
+    cmd: /usr/local/bin/rke2-killall.sh
+  delegate_to: "{{ _remove_target }}"
+  ignore_errors: true
+  changed_when: true
+
+- name: Run rke2-uninstall on removed node
+  ansible.builtin.command:
+    cmd: /usr/local/bin/rke2-uninstall.sh
+  delegate_to: "{{ _remove_target }}"
+  ignore_errors: true
+  changed_when: true

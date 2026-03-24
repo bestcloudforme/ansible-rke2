@@ -1,0 +1,3 @@
+---
+# EKS-D defaults are in the global defaults/rke2_defaults.yml
+# eksd_enabled, eksd_version, eksd_registry

@@ -1,0 +1,87 @@
+---
+- name: Create RKE2 config directory
+  ansible.builtin.file:
+    path: "{{ rke2_config_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Retrieve token from bootstrap master
+  ansible.builtin.set_fact:
+    rke2_server_token: "{{ hostvars[groups['masters'][0]]['rke2_node_token']['content'] | b64decode | trim }}"
+  no_log: true
+  when:
+    - not (rke2_bootstrap | default(false))
+    - hostvars[groups['masters'][0]]['rke2_node_token'] is defined
+    - hostvars[groups['masters'][0]]['rke2_node_token']['content'] is defined
+
+- name: Validate server token for non-bootstrap nodes
+  ansible.builtin.assert:
+    that:
+      - rke2_server_token | length > 0
+    fail_msg: >
+      Server token is empty for non-bootstrap node {{ inventory_hostname }}.
+      Ensure bootstrap master {{ groups['masters'][0] }} completed successfully.
+  when: not (rke2_bootstrap | default(false))
+
+- name: Wait for join endpoint to be reachable
+  ansible.builtin.uri:
+    url: "https://{{ rke2_lb_vip if (rke2_lb_type in ['kube-vip', 'haproxy'] and rke2_lb_vip | default('') | length > 0) else rke2_lb_external_host }}:9345/cacerts"
+    validate_certs: false
+    status_code: [200]
+  register: join_endpoint
+  until: join_endpoint.status == 200
+  retries: 30
+  delay: 10
+  when: not (rke2_bootstrap | default(false))
+
+- name: Create RKE2 manifests directory
+  ansible.builtin.file:
+    path: "{{ rke2_data_dir }}/server/manifests"
+    state: directory
+    mode: '0700'
+  when: rke2_cni == 'cilium' or (rke2_custom_manifests | default([]) | length > 0)
+
+- name: Deploy custom manifests
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ rke2_data_dir }}/server/manifests/{{ item | basename }}"
+    mode: '0600'
+  loop: "{{ rke2_custom_manifests | default([]) }}"
+  when: rke2_custom_manifests | default([]) | length > 0
+
+- name: Deploy Cilium HelmChartConfig
+  ansible.builtin.template:
+    src: rke2-cilium-config.yaml.j2
+    dest: "{{ rke2_data_dir }}/server/manifests/rke2-cilium-config.yaml"
+    mode: '0600'
+  when: rke2_cni == 'cilium'
+
+- name: Create audit log directory
+  ansible.builtin.file:
+    path: /var/log/kubernetes/audit
+    state: directory
+    mode: '0750'
+  when: rke2_audit_policy_enabled | default(false) | bool
+
+- name: Deploy audit policy
+  ansible.builtin.template:
+    src: audit-policy.yaml.j2
+    dest: "{{ rke2_config_dir }}/audit-policy.yaml"
+    mode: '0600'
+  when: rke2_audit_policy_enabled | default(false) | bool
+
+- name: Deploy PSA config
+  ansible.builtin.template:
+    src: psa-config.yaml.j2
+    dest: "{{ rke2_config_dir }}/psa-config.yaml"
+    mode: '0600'
+  when: rke2_pod_security_admission | default('') | length > 0
+
+- name: Write RKE2 server config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ rke2_config_dir }}/config.yaml"
+    mode: '0600'
+  no_log: true
+  diff: false
+  notify: Restart rke2-server

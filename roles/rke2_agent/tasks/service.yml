@@ -1,0 +1,21 @@
+---
+- name: Enable and start rke2-agent
+  ansible.builtin.systemd:
+    name: rke2-agent
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Wait for node to be Ready
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      get node {{ ansible_hostname | lower }}
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  register: node_ready
+  until: node_ready.stdout == "True"
+  retries: 30
+  delay: 10
+  changed_when: false
+  delegate_to: "{{ groups['masters'][0] }}"

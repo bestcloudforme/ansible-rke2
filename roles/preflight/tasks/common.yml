@@ -1,0 +1,76 @@
+---
+- name: Check if swap is enabled
+  ansible.builtin.command: swapon --show
+  register: swap_status
+  changed_when: false
+
+- name: Disable swap
+  ansible.builtin.command: swapoff -a
+  when: swap_status.stdout | length > 0
+  changed_when: true
+
+- name: Remove swap from fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '\sswap\s'
+    state: absent
+
+- name: Configure system resource limits
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/99-rke2.conf
+    mode: '0644'
+    content: |
+      * soft nofile {{ preflight_nofile_limit }}
+      * hard nofile {{ preflight_nofile_limit }}
+      * soft nproc {{ preflight_nproc_limit }}
+      * hard nproc {{ preflight_nproc_limit }}
+      root soft nofile {{ preflight_nofile_limit }}
+      root hard nofile {{ preflight_nofile_limit }}
+
+- name: Load required kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ preflight_required_kernel_modules }}"
+
+- name: Persist kernel modules across reboots
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/rke2.conf
+    mode: '0644'
+    content: |
+      {% for mod in preflight_required_kernel_modules %}
+      {{ mod }}
+      {% endfor %}
+
+- name: Apply sysctl parameters
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-rke2.conf
+    reload: true
+    state: present
+  loop: "{{ preflight_sysctl_params | dict2items }}"
+
+- name: Create etcd user for CIS compliance
+  ansible.builtin.user:
+    name: etcd
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+  when: rke2_cis_profile | default('') | length > 0
+
+- name: Configure container log rotation
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/container-logs
+    mode: '0644'
+    content: |
+      /var/log/containers/*.log
+      /var/log/pods/*/*.log {
+          daily
+          rotate 7
+          compress
+          missingok
+          notifempty
+          maxsize {{ preflight_logrotate_maxsize | default('250M') }}
+          copytruncate
+      }

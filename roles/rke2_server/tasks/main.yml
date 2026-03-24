@@ -1,0 +1,36 @@
+---
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - rke2_version | default('') | length > 0
+      - rke2_cni in ['canal', 'calico', 'cilium']
+      - rke2_lb_type in ['kube-vip', 'external', 'haproxy']
+    fail_msg: >-
+      Required variables: rke2_version must be set,
+      rke2_cni must be canal/calico/cilium,
+      rke2_lb_type must be kube-vip/external/haproxy
+
+- name: Validate join endpoint is configured
+  ansible.builtin.assert:
+    that:
+      - >-
+        (rke2_lb_type in ['kube-vip', 'haproxy'] and rke2_lb_vip | default('') | length > 0)
+        or (rke2_lb_type == 'external' and rke2_lb_external_host | default('') | length > 0)
+    fail_msg: >-
+      Join endpoint not configured. Set rke2_lb_vip (for kube-vip/haproxy)
+      or rke2_lb_external_host (for external LB type).
+  when: not (rke2_bootstrap | default(false))
+
+- name: Install RKE2 server (online)
+  ansible.builtin.include_tasks: install_online.yml
+  when: not (rke2_airgap | default(false) | bool)
+
+- name: Install RKE2 server (airgap)
+  ansible.builtin.include_tasks: install_airgap.yml
+  when: rke2_airgap | default(false) | bool
+
+- name: Configure RKE2 server
+  ansible.builtin.include_tasks: config.yml
+
+- name: Start RKE2 server service
+  ansible.builtin.include_tasks: service.yml

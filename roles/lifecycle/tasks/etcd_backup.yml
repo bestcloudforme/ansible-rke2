@@ -1,0 +1,58 @@
+---
+- name: Ensure RKE2 is running
+  ansible.builtin.systemd:
+    name: rke2-server
+    state: started
+  register: _rke2_start_status
+
+- name: Wait for API after start
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 6443
+    delay: 5
+    timeout: 120
+  when: _rke2_start_status.changed
+
+- name: Build etcd snapshot command
+  ansible.builtin.set_fact:
+    _etcd_snapshot_cmd: >-
+      {{ rke2_bin_dir }}/rke2 etcd-snapshot save
+      --name {{ rke2_etcd_backup_name | default('manual-' ~ ansible_date_time.iso8601_basic_short) }}
+      --data-dir {{ rke2_data_dir }}
+      {% if rke2_etcd_s3_enabled | default(false) | bool %}
+      --s3
+      --s3-bucket {{ rke2_etcd_s3_bucket }}
+      {% if rke2_etcd_s3_endpoint | default('') | length > 0 %}
+      --s3-endpoint {{ rke2_etcd_s3_endpoint }}
+      {% endif %}
+      {% if rke2_etcd_s3_region | default('') | length > 0 %}
+      --s3-region {{ rke2_etcd_s3_region }}
+      {% endif %}
+      {% if rke2_etcd_s3_access_key | default('') | length > 0 %}
+      --s3-access-key {{ rke2_etcd_s3_access_key }}
+      --s3-secret-key {{ rke2_etcd_s3_secret_key }}
+      {% endif %}
+      {% if rke2_etcd_s3_folder | default('') | length > 0 %}
+      --s3-folder {{ rke2_etcd_s3_folder }}
+      {% endif %}
+      {% if rke2_etcd_s3_skip_ssl_verify | default(false) | bool %}
+      --s3-skip-ssl-verify
+      {% endif %}
+      {% endif %}
+  no_log: true
+
+- name: Take etcd snapshot
+  ansible.builtin.command:
+    cmd: "{{ _etcd_snapshot_cmd }}"
+  changed_when: true
+  no_log: true
+
+- name: List recent snapshots
+  ansible.builtin.command:
+    cmd: "{{ rke2_bin_dir }}/rke2 etcd-snapshot list --data-dir {{ rke2_data_dir }}"
+  register: snapshot_list
+  changed_when: false
+
+- name: Show snapshot list
+  ansible.builtin.debug:
+    msg: "{{ snapshot_list.stdout_lines }}"

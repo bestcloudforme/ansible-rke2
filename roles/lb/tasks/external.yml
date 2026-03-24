@@ -1,0 +1,14 @@
+---
+- name: Validate external host is configured
+  ansible.builtin.assert:
+    that:
+      - rke2_lb_external_host | default('') | length > 0
+    fail_msg: "rke2_lb_external_host must be set when using external LB"
+
+- name: Validate external host is in TLS SANs
+  ansible.builtin.assert:
+    that:
+      - rke2_lb_external_host in (rke2_server_tls_san | default([]))
+    fail_msg: >
+      rke2_lb_external_host ({{ rke2_lb_external_host }}) must be included
+      in rke2_server_tls_san for TLS certificate validation.

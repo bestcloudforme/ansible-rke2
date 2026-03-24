@@ -1,0 +1,24 @@
+---
+# Usage:
+#   # Local snapshot:
+#   ansible-playbook playbooks/etcd_backup.yml \
+#     -i environments/my-cluster/inventory/hosts.yml
+#
+#   # Named snapshot:
+#   ansible-playbook playbooks/etcd_backup.yml \
+#     -i environments/my-cluster/inventory/hosts.yml \
+#     -e "rke2_etcd_backup_name=pre-upgrade-v1.33"
+#
+#   # S3 snapshot (configure S3 vars in group_vars):
+#   ansible-playbook playbooks/etcd_backup.yml \
+#     -i environments/my-cluster/inventory/hosts.yml
+
+- name: "etcd snapshot backup"
+  hosts: masters[0]
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: etcd_backup

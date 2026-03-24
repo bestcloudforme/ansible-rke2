@@ -1,0 +1,5 @@
+---
+rke2_server_node_labels:
+  - "node-role.kubernetes.io/control-plane=true"
+rke2_server_node_taints:
+  - "node-role.kubernetes.io/control-plane:NoSchedule"

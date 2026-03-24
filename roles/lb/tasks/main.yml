@@ -1,0 +1,21 @@
+---
+- name: Validate load balancer type
+  ansible.builtin.assert:
+    that:
+      - rke2_lb_type in ['kube-vip', 'external', 'haproxy']
+    fail_msg: "Unsupported LB type: {{ rke2_lb_type }}. Supported: kube-vip, external, haproxy"
+  when: rke2_master_count | int > 1
+
+- name: Setup kube-vip load balancer
+  ansible.builtin.include_tasks: kube_vip.yml
+  when:
+    - rke2_master_count | int > 1
+    - rke2_lb_type == 'kube-vip'
+
+- name: Validate external load balancer
+  ansible.builtin.include_tasks: external.yml
+  when:
+    - rke2_master_count | int > 1
+    - rke2_lb_type == 'external'
+
+# haproxy type is handled by the dedicated haproxy role on LB nodes

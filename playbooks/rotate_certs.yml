@@ -1,0 +1,29 @@
+---
+# Usage:
+#   ansible-playbook playbooks/rotate_certs.yml \
+#     -i environments/my-cluster/inventory/hosts.yml
+#
+# This rotates TLS certificates on all masters (serial: 1) then restarts workers.
+# RKE2 generates new certs with 1-year validity by default.
+
+- name: "Rotate certificates on masters"
+  hosts: masters
+  become: true
+  serial: 1
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: rotate_certs
+
+- name: "Restart workers to pick up new certs"
+  hosts: workers
+  become: true
+  serial: "{{ rke2_upgrade_agent_serial | default('25%') }}"
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: rotate_certs_agent

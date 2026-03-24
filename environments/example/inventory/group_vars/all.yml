@@ -1,0 +1,22 @@
+---
+# RKE2 cluster configuration
+rke2_version: "v1.32.2+rke2r1"
+rke2_cni: "canal"
+rke2_master_count: 1
+
+# Load balancer (single master = no HA, use direct connection)
+rke2_lb_type: "external"
+rke2_lb_vip: ""
+rke2_lb_external_host: "192.168.1.10"
+rke2_vip_interface: "eth0"
+rke2_server_tls_san:
+  - "192.168.1.10"
+
+# Installation mode
+rke2_airgap: false
+eksd_enabled: false
+
+# SSH connection
+ansible_user: your_user
+ansible_become: true
+ansible_become_method: sudo

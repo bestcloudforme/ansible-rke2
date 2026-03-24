@@ -1,0 +1,24 @@
+---
+- name: Validate CNI plugin
+  ansible.builtin.assert:
+    that:
+      - rke2_cni in ['canal', 'calico', 'cilium']
+    fail_msg: "Unsupported CNI: {{ rke2_cni }}. Supported: canal, calico, cilium"
+
+- name: Wait for Kubernetes API before CNI check
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 6443
+    timeout: 60
+
+- name: Verify Canal pods
+  ansible.builtin.include_tasks: verify_canal.yml
+  when: rke2_cni == 'canal'
+
+- name: Verify Calico pods
+  ansible.builtin.include_tasks: verify_calico.yml
+  when: rke2_cni == 'calico'
+
+- name: Verify Cilium pods
+  ansible.builtin.include_tasks: verify_cilium.yml
+  when: rke2_cni == 'cilium'

@@ -1,0 +1,13 @@
+---
+profile: basic
+
+warn_list:
+  - yaml[truthy]
+  - name[casing]
+  - no-changed-when
+
+skip_list:
+  - no-handler  # handlers are used but some tasks use inline handlers
+
+exclude_paths:
+  - .github/

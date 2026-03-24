@@ -1,0 +1,55 @@
+---
+- name: Check current certificate expiry
+  ansible.builtin.command:
+    cmd: >
+      openssl x509 -enddate -noout
+      -in {{ rke2_data_dir }}/server/tls/serving-kube-apiserver.crt
+  register: cert_expiry
+  changed_when: false
+  failed_when: false
+
+- name: Show current certificate expiry
+  ansible.builtin.debug:
+    msg: "API server cert: {{ cert_expiry.stdout | default('not found') }}"
+
+- name: Rotate certificates
+  ansible.builtin.command:
+    cmd: "{{ rke2_bin_dir }}/rke2 certificate rotate --data-dir {{ rke2_data_dir }}"
+  changed_when: true
+
+- name: Restart rke2-server
+  ansible.builtin.systemd:
+    name: rke2-server
+    state: restarted
+
+- name: Wait for Kubernetes API to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 6443
+    delay: 15
+    timeout: 300
+
+- name: Verify node is Ready
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      get node {{ ansible_hostname | lower }}
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  register: node_ready
+  until: node_ready.stdout == "True"
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Verify new certificate expiry
+  ansible.builtin.command:
+    cmd: >
+      openssl x509 -enddate -noout
+      -in {{ rke2_data_dir }}/server/tls/serving-kube-apiserver.crt
+  register: new_cert_expiry
+  changed_when: false
+
+- name: Show new certificate expiry
+  ansible.builtin.debug:
+    msg: "New API server cert: {{ new_cert_expiry.stdout }}"

@@ -1,0 +1,30 @@
+---
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - rke2_version | default('') | length > 0
+    fail_msg: "rke2_version must be set in group_vars/all.yml"
+
+- name: Validate join endpoint is configured
+  ansible.builtin.assert:
+    that:
+      - >-
+        (rke2_lb_type in ['kube-vip', 'haproxy'] and rke2_lb_vip | default('') | length > 0)
+        or (rke2_lb_type == 'external' and rke2_lb_external_host | default('') | length > 0)
+    fail_msg: >-
+      Join endpoint not configured. Set rke2_lb_vip (for kube-vip/haproxy)
+      or rke2_lb_external_host (for external LB type).
+
+- name: Install RKE2 agent (online)
+  ansible.builtin.include_tasks: install_online.yml
+  when: not (rke2_airgap | default(false) | bool)
+
+- name: Install RKE2 agent (airgap)
+  ansible.builtin.include_tasks: install_airgap.yml
+  when: rke2_airgap | default(false) | bool
+
+- name: Configure RKE2 agent
+  ansible.builtin.include_tasks: config.yml
+
+- name: Start RKE2 agent service
+  ansible.builtin.include_tasks: service.yml

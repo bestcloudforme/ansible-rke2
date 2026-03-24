@@ -1,0 +1,31 @@
+# Ansible
+*.retry
+*.pyc
+__pycache__/
+
+# Secrets
+.vault_pass
+*.vault
+.env
+kubeconfig.yaml
+
+# Galaxy build artifacts
+*.tar.gz
+
+# Testing
+.molecule/
+.cache/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

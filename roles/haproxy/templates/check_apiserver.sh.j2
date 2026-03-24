@@ -1,0 +1,15 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Health check for keepalived - verifies HAProxy and K8s API are reachable
+
+errorExit() {
+    echo "*** $*" 1>&2
+    exit 1
+}
+
+if ! pidof haproxy > /dev/null 2>&1; then
+    errorExit "HAProxy is not running"
+fi
+
+curl --silent --fail --max-time 2 --insecure https://localhost:{{ haproxy_api_frontend_port }}/livez -o /dev/null || \
+    errorExit "API server health check failed"

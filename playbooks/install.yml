@@ -1,0 +1,96 @@
+---
+# Pre-flight validation
+- name: "Validate inventory and configuration"
+  hosts: masters[0]
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Validate rke2_version is set
+      ansible.builtin.assert:
+        that:
+          - rke2_version | default('') | length > 0
+        fail_msg: "rke2_version must be set in group_vars/all.yml (e.g. v1.32.2+rke2r1)"
+
+    - name: Validate rke2_master_count matches inventory
+      ansible.builtin.assert:
+        that:
+          - rke2_master_count | int == groups['masters'] | length
+        fail_msg: >-
+          rke2_master_count ({{ rke2_master_count }}) does not match
+          actual masters in inventory ({{ groups['masters'] | length }}).
+          Update rke2_master_count in group_vars/all.yml.
+
+# Phase 0: HAProxy Load Balancers (VIP must be ready before masters)
+- name: "Phase 0: HAProxy load balancers"
+  hosts: loadbalancers
+  become: true
+  force_handlers: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: haproxy
+      when: rke2_lb_type | default('external') == 'haproxy'
+
+# Phase 1: Preflight on all K8s nodes
+- name: "Phase 1: OS prerequisites"
+  hosts: masters,workers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: preflight
+
+# Phase 2: Load balancer (kube-vip on first master, if HA and not haproxy)
+- name: "Phase 2: Load balancer (kube-vip)"
+  hosts: masters[0]
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lb
+      when:
+        - rke2_master_count | int > 1
+        - rke2_lb_type | default('external') != 'haproxy'
+
+# Phase 3: Bootstrap masters (serial 1 for ordered join)
+- name: "Phase 3: Bootstrap masters"
+  hosts: masters
+  become: true
+  force_handlers: true
+  serial: 1
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_server
+  vars:
+    rke2_bootstrap: "{{ hostvars[inventory_hostname]['rke2_bootstrap'] | default(false) }}"
+
+# Phase 4: EKS-D images (optional)
+- name: "Phase 4: EKS-D images"
+  hosts: masters,workers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: eksd_images
+      when: eksd_enabled | default(false) | bool
+
+# Phase 5: Worker nodes
+- name: "Phase 5: Worker nodes"
+  hosts: workers
+  become: true
+  force_handlers: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_agent
+
+# Phase 6: CNI verification
+- name: "Phase 6: CNI verification"
+  hosts: masters[0]
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: cni

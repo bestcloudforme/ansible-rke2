@@ -1,0 +1,74 @@
+---
+- name: "Uninstall RKE2 from workers"
+  hosts: workers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: uninstall
+
+- name: "Uninstall RKE2 from masters"
+  hosts: masters
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: lifecycle
+  vars:
+    lifecycle_action: uninstall
+
+- name: "Uninstall HAProxy and Keepalived"
+  hosts: loadbalancers
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  tasks:
+    - name: Stop keepalived
+      ansible.builtin.systemd:
+        name: keepalived
+        state: stopped
+        enabled: false
+      ignore_errors: true
+      when: rke2_lb_type | default('external') == 'haproxy'
+
+    - name: Stop haproxy
+      ansible.builtin.systemd:
+        name: haproxy
+        state: stopped
+        enabled: false
+      ignore_errors: true
+      when: rke2_lb_type | default('external') == 'haproxy'
+
+    - name: Remove packages (RHEL)
+      ansible.builtin.dnf:
+        name:
+          - haproxy
+          - keepalived
+        state: absent
+      when:
+        - rke2_lb_type | default('external') == 'haproxy'
+        - ansible_os_family == "RedHat"
+
+    - name: Remove packages (Debian)
+      ansible.builtin.apt:
+        name:
+          - haproxy
+          - keepalived
+        state: absent
+        purge: true
+      when:
+        - rke2_lb_type | default('external') == 'haproxy'
+        - ansible_os_family == "Debian"
+
+    - name: Remove configuration files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/haproxy
+        - /etc/keepalived
+        - /usr/local/bin/check_apiserver.sh
+        - /etc/sysctl.d/99-haproxy.conf
+      when: rke2_lb_type | default('external') == 'haproxy'

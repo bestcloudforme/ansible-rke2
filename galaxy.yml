@@ -1,0 +1,39 @@
+---
+namespace: bestcloudforme
+name: rke2
+version: 1.1.0
+readme: README.md
+authors:
+  - bestcloudforme
+description: >-
+  Production-ready Ansible playbooks for deploying RKE2 Kubernetes clusters.
+  Supports single-master dev setups and full HA production clusters
+  with HAProxy + keepalived, kube-vip, or external load balancers.
+license:
+  - Apache-2.0
+license_file: LICENSE
+tags:
+  - kubernetes
+  - rke2
+  - rancher
+  - k8s
+  - cluster
+  - ha
+  - haproxy
+  - keepalived
+  - cilium
+  - calico
+  - canal
+  - etcd
+  - airgap
+repository: https://github.com/bestcloudforme/ansible-rke2
+documentation: https://github.com/bestcloudforme/ansible-rke2/blob/main/README.md
+homepage: https://github.com/bestcloudforme/ansible-rke2
+issues: https://github.com/bestcloudforme/ansible-rke2/issues
+dependencies: {}
+build_ignore:
+  - .github
+  - .ansible-lint
+  - environments
+  - kubeconfig.yaml
+  - "*.tar.gz"
