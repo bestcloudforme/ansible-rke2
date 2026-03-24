@@ -16,6 +16,24 @@ Production-ready Ansible playbooks for deploying RKE2 Kubernetes clusters. Suppo
 - **Multi-Environment**: Shared roles, per-cluster environment configs
 - **Rolling Upgrades**: Masters serial:1, workers serial:25% with drain/uncordon
 
+## Compatibility Matrix
+
+| Component | Tested Versions |
+|-----------|----------------|
+| **Ansible** | 2.15, 2.16, 2.17 (ansible-core) |
+| **Python** | 3.9, 3.10, 3.11, 3.12 |
+| **RKE2** | v1.28.x, v1.29.x, v1.30.x, v1.31.x, v1.32.x |
+| **RHEL/Rocky/Alma** | 8.x, 9.x |
+| **Ubuntu** | 20.04, 22.04, 24.04 |
+| **Debian** | 11 (Bullseye), 12 (Bookworm) |
+
+**Required Ansible Collections:**
+
+| Collection | Version Range |
+|-----------|---------------|
+| `ansible.posix` | >= 1.5, < 2.0 |
+| `community.general` | >= 7.0, < 10.0 |
+
 ## Quick Start
 
 ```bash
@@ -37,6 +55,10 @@ ansible-playbook playbooks/install.yml \
 ```
 ansible-rke2/
 ├── defaults/rke2_defaults.yml          # All default variables (single source of truth)
+├── docs/                               # Operational runbooks and guides
+│   ├── upgrade-checklist.md
+│   ├── backup-restore-runbook.md
+│   └── vault-guide.md
 ├── environments/
 │   ├── example/                        # Single-master example
 │   │   ├── inventory/
@@ -47,6 +69,10 @@ ansible-rke2/
 │       ├── inventory/
 │       │   ├── hosts.yml
 │       │   └── group_vars/
+│       │       ├── all.yml             # Cluster-wide vars
+│       │       ├── masters.yml         # Master-specific vars
+│       │       ├── workers.yml         # Worker-specific vars
+│       │       └── loadbalancers.yml   # HAProxy/keepalived vars
 │       └── cluster.yml                # Cluster metadata (name, env, notes)
 ├── playbooks/
 │   ├── install.yml                     # Fresh cluster install
@@ -68,6 +94,37 @@ ansible-rke2/
     ├── eksd_images/                    # EKS Distro image configuration
     └── lifecycle/                      # Upgrade, remove, uninstall operations
 ```
+
+## Network Requirements
+
+All RKE2 nodes require the following ports open between them:
+
+| Port | Protocol | Direction | Purpose |
+|------|----------|-----------|---------|
+| 6443 | TCP | Inbound | Kubernetes API server |
+| 9345 | TCP | Inbound | RKE2 supervisor API (node join) |
+| 2379 | TCP | Masters only | etcd client |
+| 2380 | TCP | Masters only | etcd peer |
+| 8472 | UDP | All nodes | VXLAN overlay (Canal/Flannel) |
+| 10250 | TCP | All nodes | kubelet metrics |
+| 10255 | TCP | All nodes | kubelet read-only |
+| 179 | TCP | All nodes | BGP (Calico only) |
+| 4240 | TCP | All nodes | Cilium health check (Cilium only) |
+| 8090 | TCP | All nodes | Cilium Hubble (Cilium only) |
+
+**HAProxy nodes (when `rke2_lb_type: haproxy`):**
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 6443 | TCP | API frontend (proxied to masters) |
+| 9345 | TCP | Join frontend (proxied to masters) |
+| 9000 | TCP | HAProxy stats page |
+
+**Firewall handling:**
+
+- **RHEL/Rocky/Alma**: The `preflight` role opens ports via `firewalld` if the service is active. If `firewalld` is not running, ports are not managed.
+- **Ubuntu/Debian**: The `preflight` role opens ports via `ufw` if the service is active. If `ufw` is not running, ports are not managed.
+- If you use a different firewall solution, open the ports listed above manually before running the install playbook.
 
 ## Playbooks
 
@@ -96,9 +153,11 @@ ansible-playbook playbooks/upgrade.yml \
   -e "rke2_version=v1.33.0+rke2r1"
 ```
 
-Rolling upgrade with drain/uncordon. Masters upgraded one at a time, workers at 25%.
+Rolling upgrade with cordon/drain/uncordon. Masters upgraded one at a time, workers at 25%. If an upgrade fails mid-flight, the node is automatically uncordoned.
 
 **Note:** Drain/uncordon operations use `ansible_hostname` as the Kubernetes node name. Ensure the OS hostname matches the Kubernetes node name (default RKE2 behavior).
+
+**Pre-upgrade checklist:** See [docs/upgrade-checklist.md](docs/upgrade-checklist.md)
 
 ### Add Node
 
@@ -141,6 +200,8 @@ ansible-playbook playbooks/etcd_backup.yml \
 ```
 
 S3 backup is supported — configure `rke2_etcd_s3_*` variables in `group_vars/all.yml`.
+
+**Full backup/restore guide:** See [docs/backup-restore-runbook.md](docs/backup-restore-runbook.md)
 
 ### etcd Restore
 
@@ -233,6 +294,20 @@ rke2_system_reserved_memory: "512Mi"
 rke2_protect_kernel_defaults: true
 ```
 
+### Group Vars Structure
+
+For HA clusters, split variables across group-specific files:
+
+```
+group_vars/
+├── all.yml              # Cluster-wide: version, CNI, LB config, hardening
+├── masters.yml          # Master-specific: taints, labels
+├── workers.yml          # Worker-specific: labels
+└── loadbalancers.yml    # HAProxy/keepalived: passwords, VIP interface
+```
+
+See `environments/ha-example/` for a complete example.
+
 ### Variables Reference
 
 All defaults are in `defaults/rke2_defaults.yml`. Override per-environment in `group_vars/`.
@@ -298,6 +373,35 @@ All defaults are in `defaults/rke2_defaults.yml`. Override per-environment in `g
 | `rke2_upgrade_agent_serial` | `25%` | Worker upgrade batch percentage |
 | `rke2_reboot_after_uninstall` | `false` | Reboot nodes after uninstall |
 
+## Airgap Installation
+
+For airgap (offline) environments:
+
+1. **Download artifacts** on an internet-connected machine:
+   ```bash
+   # Download RKE2 artifacts for your target version
+   RKE2_VERSION="v1.32.2+rke2r1"
+   mkdir -p rke2-artifacts && cd rke2-artifacts
+   curl -LO "https://github.com/rancher/rke2/releases/download/${RKE2_VERSION}/rke2-images.linux-amd64.tar.zst"
+   curl -LO "https://github.com/rancher/rke2/releases/download/${RKE2_VERSION}/rke2.linux-amd64.tar.gz"
+   curl -LO "https://github.com/rancher/rke2/releases/download/${RKE2_VERSION}/sha256sum-amd64.txt"
+   curl -LO "https://get.rke2.io" -o install.sh && chmod +x install.sh
+   ```
+
+2. **Transfer artifacts** to all target nodes at `rke2_airgap_images_path` (default: `/opt/rke2-artifacts/`).
+
+3. **Configure inventory:**
+   ```yaml
+   # group_vars/all.yml
+   rke2_airgap: true
+   rke2_airgap_images_path: "/opt/rke2-artifacts"
+   ```
+
+4. **Run install** as normal:
+   ```bash
+   ansible-playbook playbooks/install.yml -i environments/my-cluster/inventory/hosts.yml
+   ```
+
 ## Adding a New Cluster
 
 ```bash
@@ -307,19 +411,97 @@ cp -r environments/example environments/my-cluster
 
 Only override what differs from `defaults/rke2_defaults.yml`.
 
-## Security Notes
+## Security
+
+### General
 
 - Use SSH keys instead of passwords for authentication
 - Use `ansible-vault` to encrypt any sensitive variables
 - Change all default passwords (`haproxy_stats_password`, `keepalived_auth_pass`)
 - Never commit credentials to version control
 
+### Using Ansible Vault
+
+Encrypt sensitive variables per-environment:
+
+```bash
+# Create encrypted secrets file
+ansible-vault create environments/my-cluster/inventory/group_vars/vault.yml
+```
+
+```yaml
+# vault.yml (encrypted)
+vault_haproxy_stats_password: "my-secure-password"
+vault_keepalived_auth_pass: "k8sHA01"
+vault_rke2_etcd_s3_access_key: "AKIA..."
+vault_rke2_etcd_s3_secret_key: "wJal..."
+```
+
+Reference vault variables in `group_vars/all.yml` or `loadbalancers.yml`:
+
+```yaml
+# loadbalancers.yml
+haproxy_stats_password: "{{ vault_haproxy_stats_password }}"
+keepalived_auth_pass: "{{ vault_keepalived_auth_pass }}"
+```
+
+```yaml
+# all.yml
+rke2_etcd_s3_access_key: "{{ vault_rke2_etcd_s3_access_key }}"
+rke2_etcd_s3_secret_key: "{{ vault_rke2_etcd_s3_secret_key }}"
+```
+
+Run playbooks with `--ask-vault-pass` or `--vault-password-file`:
+
+```bash
+ansible-playbook playbooks/install.yml \
+  -i environments/my-cluster/inventory/hosts.yml \
+  --ask-vault-pass
+```
+
+See [docs/vault-guide.md](docs/vault-guide.md) for SOPS integration and CI/CD patterns.
+
+## Failure and Rollback
+
+### Upgrade failure
+
+If a rolling upgrade fails mid-way:
+- The failed node is automatically **uncordoned** (block/rescue pattern)
+- Already-upgraded nodes remain on the new version
+- Non-upgraded nodes stay on the old version
+- RKE2 supports mixed-version clusters within one minor version
+
+**To retry:** Fix the issue and re-run the upgrade playbook. It will skip already-upgraded nodes.
+
+### etcd restore failure
+
+If etcd restore fails:
+- All masters are stopped (by design)
+- Re-run the restore playbook to retry
+- If the cluster is unrecoverable, use `uninstall.yml` and re-deploy from scratch
+
+### Node failure
+
+If a node becomes unresponsive:
+1. Remove it from the cluster: `ansible-playbook playbooks/remove_node.yml -e "node_name=<name>"`
+2. Fix or replace the node
+3. Re-add it: `ansible-playbook playbooks/add_node.yml -e "target_hosts=<host>"`
+
+## Day-2 Operations
+
+| Operation | Guide |
+|-----------|-------|
+| Upgrade pre-flight checklist | [docs/upgrade-checklist.md](docs/upgrade-checklist.md) |
+| Backup and restore runbook | [docs/backup-restore-runbook.md](docs/backup-restore-runbook.md) |
+| Vault and secrets management | [docs/vault-guide.md](docs/vault-guide.md) |
+
 ## Requirements
 
-- Ansible >= 2.15
+- Ansible >= 2.15 (ansible-core)
 - Python >= 3.9
-- Target nodes: RHEL/Rocky/AlmaLinux 8+ or Ubuntu 20.04+
+- Target nodes: RHEL/Rocky/AlmaLinux 8+ or Ubuntu 20.04+ or Debian 11+
 - SSH access with sudo privileges
+- Minimum 2 CPU, 4 GB RAM per node (4 CPU, 8 GB recommended for masters)
 
 ## License
 
