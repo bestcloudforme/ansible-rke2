@@ -1,4 +1,13 @@
 ---
+- name: Cordon worker node before upgrade
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      cordon {{ ansible_hostname | lower }}
+  delegate_to: "{{ groups['masters'][0] }}"
+  changed_when: true
+
 - name: Drain worker node before upgrade
   ansible.builtin.command:
     cmd: >

@@ -56,6 +56,7 @@
     name: etcd
     system: true
     shell: /sbin/nologin
+    home: /var/lib/etcd
     create_home: false
   when: rke2_cis_profile | default('') | length > 0
 

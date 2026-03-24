@@ -16,4 +16,4 @@ spec:
       masquerade: true
 {% endif %}
     operator:
-      replicas: 1
+      replicas: {{ 2 if (rke2_master_count | int > 1) else 1 }}

@@ -6,6 +6,16 @@
          if (groups['masters'] | length > 1)
          else inventory_hostname }}
 
+- name: Cordon master node before upgrade
+  ansible.builtin.command:
+    cmd: >
+      {{ rke2_bin_dir }}/kubectl
+      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+      cordon {{ ansible_hostname | lower }}
+  delegate_to: "{{ _other_master }}"
+  when: groups['masters'] | length > 1
+  changed_when: true
+
 - name: Drain master node before upgrade
   ansible.builtin.command:
     cmd: >

@@ -24,7 +24,7 @@
   tasks:
     - name: Update HAProxy configuration
       ansible.builtin.template:
-        src: "../roles/haproxy/templates/haproxy.cfg.j2"
+        src: "{{ playbook_dir }}/../roles/haproxy/templates/haproxy.cfg.j2"
         dest: /etc/haproxy/haproxy.cfg
         mode: '0644'
         validate: haproxy -c -f %s

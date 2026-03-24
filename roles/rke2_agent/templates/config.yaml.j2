@@ -29,11 +29,25 @@ system-default-registry: {{ rke2_registry_mirror }}
 
 {# kubelet args (resource reservations + eviction) #}
 {% set kubelet_args = [] %}
-{% if rke2_kube_reserved_cpu | default('') | length > 0 and rke2_kube_reserved_memory | default('') | length > 0 %}
-{%   set _ = kubelet_args.append("kube-reserved=cpu=" ~ rke2_kube_reserved_cpu ~ ",memory=" ~ rke2_kube_reserved_memory) %}
+{% if rke2_kube_reserved_cpu | default('') | length > 0 or rke2_kube_reserved_memory | default('') | length > 0 %}
+{%   set _kube_reserved_parts = [] %}
+{%   if rke2_kube_reserved_cpu | default('') | length > 0 %}
+{%     set _ = _kube_reserved_parts.append("cpu=" ~ rke2_kube_reserved_cpu) %}
+{%   endif %}
+{%   if rke2_kube_reserved_memory | default('') | length > 0 %}
+{%     set _ = _kube_reserved_parts.append("memory=" ~ rke2_kube_reserved_memory) %}
+{%   endif %}
+{%   set _ = kubelet_args.append("kube-reserved=" ~ _kube_reserved_parts | join(",")) %}
 {% endif %}
-{% if rke2_system_reserved_cpu | default('') | length > 0 and rke2_system_reserved_memory | default('') | length > 0 %}
-{%   set _ = kubelet_args.append("system-reserved=cpu=" ~ rke2_system_reserved_cpu ~ ",memory=" ~ rke2_system_reserved_memory) %}
+{% if rke2_system_reserved_cpu | default('') | length > 0 or rke2_system_reserved_memory | default('') | length > 0 %}
+{%   set _system_reserved_parts = [] %}
+{%   if rke2_system_reserved_cpu | default('') | length > 0 %}
+{%     set _ = _system_reserved_parts.append("cpu=" ~ rke2_system_reserved_cpu) %}
+{%   endif %}
+{%   if rke2_system_reserved_memory | default('') | length > 0 %}
+{%     set _ = _system_reserved_parts.append("memory=" ~ rke2_system_reserved_memory) %}
+{%   endif %}
+{%   set _ = kubelet_args.append("system-reserved=" ~ _system_reserved_parts | join(",")) %}
 {% endif %}
 {% if rke2_eviction_hard | default('') | length > 0 %}
 {%   set _ = kubelet_args.append("eviction-hard=" ~ rke2_eviction_hard) %}

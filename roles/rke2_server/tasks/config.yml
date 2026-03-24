@@ -18,10 +18,9 @@
   ansible.builtin.assert:
     that:
       - rke2_server_token | length > 0
-    fail_msg: >
-      Server token is empty for non-bootstrap node {{ inventory_hostname }}.
-      Ensure bootstrap master {{ groups['masters'][0] }} completed successfully.
+    fail_msg: "Server token is empty for non-bootstrap node {{ inventory_hostname }}."
   when: not (rke2_bootstrap | default(false))
+  no_log: true
 
 - name: Wait for join endpoint to be reachable
   ansible.builtin.uri:

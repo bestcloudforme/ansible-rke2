@@ -29,10 +29,6 @@
       {% if rke2_etcd_s3_region | default('') | length > 0 %}
       --etcd-s3-region {{ rke2_etcd_s3_region }}
       {% endif %}
-      {% if rke2_etcd_s3_access_key | default('') | length > 0 %}
-      --etcd-s3-access-key {{ rke2_etcd_s3_access_key }}
-      --etcd-s3-secret-key {{ rke2_etcd_s3_secret_key }}
-      {% endif %}
       {% if rke2_etcd_s3_folder | default('') | length > 0 %}
       --etcd-s3-folder {{ rke2_etcd_s3_folder }}
       {% endif %}
@@ -46,11 +42,14 @@
 - name: Restore etcd snapshot (bootstrap master only)
   ansible.builtin.command:
     cmd: "{{ _etcd_restore_cmd }}"
+  environment: "{{ _s3_env }}"
   when: inventory_hostname == groups['masters'][0]
   changed_when: true
   async: 300
   poll: 10
   no_log: true
+  vars:
+    _s3_env: "{{ {'AWS_ACCESS_KEY_ID': rke2_etcd_s3_access_key, 'AWS_SECRET_ACCESS_KEY': rke2_etcd_s3_secret_key} if (rke2_etcd_s3_enabled | default(false) | bool and rke2_etcd_s3_access_key | default('') | length > 0) else {} }}"
 
 - name: Remove cluster-reset flag file
   ansible.builtin.file:
