@@ -501,7 +501,6 @@ If a node becomes unresponsive:
 - Python >= 3.9
 - Target nodes: RHEL/Rocky/AlmaLinux 8+ or Ubuntu 20.04+ or Debian 11+
 - SSH access with sudo privileges
-- Minimum 2 CPU, 4 GB RAM per node (4 CPU, 8 GB recommended for masters)
 
 ## Acknowledgements
 
