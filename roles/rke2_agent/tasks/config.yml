@@ -20,6 +20,7 @@
     fail_msg: >
       Server token is not available. Ensure bootstrap master
       {{ groups['masters'][0] }} completed successfully.
+  no_log: true
 
 - name: Write RKE2 agent config
   ansible.builtin.template:

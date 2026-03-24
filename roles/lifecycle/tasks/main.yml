@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - lifecycle_action in ['upgrade_server', 'upgrade_agent', 'uninstall',
-                              'remove_node', 'etcd_backup',
+                              'remove_node', 'etcd_backup', 'etcd_restore',
                               'rotate_certs', 'rotate_certs_agent']
     fail_msg: "Invalid lifecycle_action: {{ lifecycle_action }}"
 

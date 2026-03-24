@@ -42,12 +42,12 @@ ansible-rke2/
 │   │   ├── inventory/
 │   │   │   ├── hosts.yml
 │   │   │   └── group_vars/
-│   │   └── cluster.yml
+│   │   └── cluster.yml                # Cluster metadata (name, env, notes)
 │   └── ha-example/                     # HA cluster example (3 master + HAProxy)
 │       ├── inventory/
 │       │   ├── hosts.yml
 │       │   └── group_vars/
-│       └── cluster.yml
+│       └── cluster.yml                # Cluster metadata (name, env, notes)
 ├── playbooks/
 │   ├── install.yml                     # Fresh cluster install
 │   ├── upgrade.yml                     # Rolling upgrade

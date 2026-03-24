@@ -5,6 +5,8 @@
       {{ rke2_bin_dir }}/kubectl
       --kubeconfig {{ rke2_config_dir }}/rke2.yaml
       cordon {{ ansible_hostname | lower }}
+  register: cordon_result
+  failed_when: cordon_result.rc != 0
   delegate_to: "{{ groups['masters'][0] }}"
   changed_when: true
 
@@ -17,67 +19,86 @@
       --ignore-daemonsets
       --delete-emptydir-data
       --timeout={{ rke2_drain_timeout }}
+  register: drain_result
+  failed_when: drain_result.rc != 0
   delegate_to: "{{ groups['masters'][0] }}"
   changed_when: true
 
-- name: Stop rke2-agent
-  ansible.builtin.systemd:
-    name: rke2-agent
-    state: stopped
+- name: Upgrade worker node
+  block:
+    - name: Stop rke2-agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: stopped
 
-- name: Download RKE2 install script
-  ansible.builtin.get_url:
-    url: https://get.rke2.io
-    dest: /tmp/rke2-install.sh
-    mode: '0755'
-  when: not (rke2_airgap | default(false) | bool)
+    - name: Download RKE2 install script
+      ansible.builtin.get_url:
+        url: https://get.rke2.io
+        dest: /tmp/rke2-install.sh
+        mode: '0755'
+      when: not (rke2_airgap | default(false) | bool)
 
-- name: Upgrade RKE2 agent (online)
-  ansible.builtin.command:
-    cmd: /tmp/rke2-install.sh
-  environment:
-    INSTALL_RKE2_VERSION: "{{ rke2_version }}"
-    INSTALL_RKE2_TYPE: "agent"
-    INSTALL_RKE2_CHANNEL: "{{ rke2_channel }}"
-  when: not (rke2_airgap | default(false) | bool)
-  changed_when: true
+    - name: Upgrade RKE2 agent (online)
+      ansible.builtin.command:
+        cmd: /tmp/rke2-install.sh
+      environment:
+        INSTALL_RKE2_VERSION: "{{ rke2_version }}"
+        INSTALL_RKE2_TYPE: "agent"
+        INSTALL_RKE2_CHANNEL: "{{ rke2_channel }}"
+      when: not (rke2_airgap | default(false) | bool)
+      changed_when: true
 
-- name: Copy RKE2 install script from airgap artifacts
-  ansible.builtin.copy:
-    src: "{{ rke2_airgap_images_path }}/install.sh"
-    dest: /tmp/rke2-install.sh
-    mode: '0755'
-    remote_src: true
-  when: rke2_airgap | default(false) | bool
+    - name: Copy RKE2 install script from airgap artifacts
+      ansible.builtin.copy:
+        src: "{{ rke2_airgap_images_path }}/install.sh"
+        dest: /tmp/rke2-install.sh
+        mode: '0755'
+        remote_src: true
+      when: rke2_airgap | default(false) | bool
 
-- name: Upgrade RKE2 agent (airgap)
-  ansible.builtin.command:
-    cmd: /tmp/rke2-install.sh
-  environment:
-    INSTALL_RKE2_VERSION: "{{ rke2_version }}"
-    INSTALL_RKE2_TYPE: "agent"
-    INSTALL_RKE2_ARTIFACT_PATH: "{{ rke2_airgap_images_path }}"
-  when: rke2_airgap | default(false) | bool
-  changed_when: true
+    - name: Upgrade RKE2 agent (airgap)
+      ansible.builtin.command:
+        cmd: /tmp/rke2-install.sh
+      environment:
+        INSTALL_RKE2_VERSION: "{{ rke2_version }}"
+        INSTALL_RKE2_TYPE: "agent"
+        INSTALL_RKE2_ARTIFACT_PATH: "{{ rke2_airgap_images_path }}"
+      when: rke2_airgap | default(false) | bool
+      changed_when: true
 
-- name: Start rke2-agent
-  ansible.builtin.systemd:
-    name: rke2-agent
-    state: started
+    - name: Start rke2-agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: started
 
-- name: Wait for node to be Ready
-  ansible.builtin.command:
-    cmd: >
-      {{ rke2_bin_dir }}/kubectl
-      --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-      get node {{ ansible_hostname | lower }}
-      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-  register: node_ready
-  until: node_ready.stdout == "True"
-  retries: 30
-  delay: 10
-  changed_when: false
-  delegate_to: "{{ groups['masters'][0] }}"
+    - name: Wait for node to be Ready
+      ansible.builtin.command:
+        cmd: >
+          {{ rke2_bin_dir }}/kubectl
+          --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+          get node {{ ansible_hostname | lower }}
+          -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+      register: node_ready
+      until: node_ready.stdout == "True"
+      retries: 30
+      delay: 10
+      changed_when: false
+      delegate_to: "{{ groups['masters'][0] }}"
+
+  rescue:
+    - name: Uncordon worker node after upgrade failure
+      ansible.builtin.command:
+        cmd: >
+          {{ rke2_bin_dir }}/kubectl
+          --kubeconfig {{ rke2_config_dir }}/rke2.yaml
+          uncordon {{ ansible_hostname | lower }}
+      delegate_to: "{{ groups['masters'][0] }}"
+      changed_when: true
+      ignore_errors: true
+
+    - name: Fail with upgrade error
+      ansible.builtin.fail:
+        msg: "Worker upgrade failed on {{ inventory_hostname }}. Node has been uncordoned."
 
 - name: Uncordon worker node after upgrade
   ansible.builtin.command:

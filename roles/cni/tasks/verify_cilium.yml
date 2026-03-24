@@ -1,13 +1,18 @@
 ---
-- name: Wait for all Cilium pods to be Ready
+- name: Wait for Cilium pods to exist and be Ready
   ansible.builtin.shell:
-    cmd: >
-      {{ rke2_bin_dir }}/kubectl --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-      get pods -n kube-system -l k8s-app=cilium
-      -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
-      | grep -v '^True$' | grep -c . || true
-  register: cilium_not_ready
-  until: cilium_not_ready.stdout | int == 0
+    cmd: |
+      set -o pipefail
+      TOTAL=$({{ rke2_bin_dir }}/kubectl --kubeconfig {{ rke2_config_dir }}/rke2.yaml \
+        get pods -n kube-system -l k8s-app=cilium --no-headers 2>/dev/null | wc -l)
+      NOT_READY=$({{ rke2_bin_dir }}/kubectl --kubeconfig {{ rke2_config_dir }}/rke2.yaml \
+        get pods -n kube-system -l k8s-app=cilium \
+        -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
+        | grep -v '^True$' | grep -c . || true)
+      [ "$TOTAL" -gt 0 ] && [ "$NOT_READY" -eq 0 ] && echo 0 || echo 1
+    executable: /bin/bash
+  register: cilium_check
+  until: cilium_check.stdout | trim | int == 0
   retries: 20
   delay: 15
   changed_when: false
