@@ -16,7 +16,7 @@
 - name: Build etcd snapshot command
   ansible.builtin.set_fact:
     _etcd_snapshot_cmd: >-
-      {{ rke2_bin_dir }}/rke2 etcd-snapshot save
+      {{ rke2_cli }} etcd-snapshot save
       --name {{ rke2_etcd_backup_name | default('manual-' ~ ansible_date_time.iso8601_basic_short) }}
       --data-dir {{ rke2_data_dir }}
       {% if rke2_etcd_s3_enabled | default(false) | bool %}
@@ -55,7 +55,7 @@
 
 - name: List recent snapshots
   ansible.builtin.command:
-    cmd: "{{ rke2_bin_dir }}/rke2 etcd-snapshot list --data-dir {{ rke2_data_dir }}"
+    cmd: "{{ rke2_cli }} etcd-snapshot list --data-dir {{ rke2_data_dir }}"
   register: snapshot_list
   changed_when: false
 

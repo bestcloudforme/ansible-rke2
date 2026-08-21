@@ -7,5 +7,22 @@
                               'rotate_certs', 'rotate_certs_agent']
     fail_msg: "Invalid lifecycle_action: {{ lifecycle_action }}"
 
+- name: Locate the rke2 CLI
+  ansible.builtin.stat:
+    path: "{{ rke2_cli }}"
+  register: rke2_cli_stat
+  when: lifecycle_action in ['etcd_backup', 'etcd_restore', 'rotate_certs']
+
+- name: Validate the rke2 CLI is present
+  ansible.builtin.assert:
+    that:
+      - rke2_cli_stat.stat.exists
+      - rke2_cli_stat.stat.executable
+    fail_msg: >-
+      rke2 CLI not found at {{ rke2_cli }}. get.rke2.io installs it under
+      /usr/bin on RHEL-family (rpm) and /usr/local/bin elsewhere (tarball).
+      Set rke2_install_bin_dir if you installed it somewhere else.
+  when: lifecycle_action in ['etcd_backup', 'etcd_restore', 'rotate_certs']
+
 - name: Run lifecycle action
   ansible.builtin.include_tasks: "{{ lifecycle_action }}.yml"

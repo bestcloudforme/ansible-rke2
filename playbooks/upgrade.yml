@@ -7,7 +7,7 @@
   tasks:
     - name: Check current RKE2 version
       ansible.builtin.command:
-        cmd: /usr/local/bin/rke2 --version
+        cmd: "{{ rke2_cli }} --version"
       register: current_version
       changed_when: false
       ignore_errors: true

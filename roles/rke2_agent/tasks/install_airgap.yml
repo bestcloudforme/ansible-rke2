@@ -13,7 +13,7 @@
 
 - name: Check if RKE2 agent is already installed
   ansible.builtin.stat:
-    path: /usr/local/bin/rke2
+    path: "{{ rke2_cli }}"
   register: rke2_binary
 
 - name: Copy RKE2 install script from airgap artifacts
@@ -27,7 +27,7 @@
 - name: Install RKE2 agent (airgap)
   ansible.builtin.command:
     cmd: /tmp/rke2-install.sh
-    creates: /usr/local/bin/rke2
+    creates: "{{ rke2_cli }}"
   environment:
     INSTALL_RKE2_VERSION: "{{ rke2_version }}"
     INSTALL_RKE2_TYPE: "agent"

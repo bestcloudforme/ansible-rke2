@@ -47,7 +47,7 @@ S3 credentials are passed via environment variables (not CLI args) for security.
 SSH to any master and run:
 
 ```bash
-/var/lib/rancher/rke2/bin/rke2 etcd-snapshot list
+rke2 etcd-snapshot list
 ```
 
 ## Restore
@@ -65,7 +65,7 @@ SSH to any master and run:
 
 ```bash
 # List available snapshots on the bootstrap master
-ssh master01 '/var/lib/rancher/rke2/bin/rke2 etcd-snapshot list'
+ssh master01 'sudo rke2 etcd-snapshot list'
 
 # Restore
 ansible-playbook playbooks/etcd_restore.yml \

@@ -1,7 +1,7 @@
 ---
 - name: Check if RKE2 is already installed
   ansible.builtin.stat:
-    path: /usr/local/bin/rke2
+    path: "{{ rke2_cli }}"
   register: rke2_binary
 
 - name: Download RKE2 install script
@@ -14,7 +14,7 @@
 - name: Install RKE2 server
   ansible.builtin.command:
     cmd: /tmp/rke2-install.sh
-    creates: /usr/local/bin/rke2
+    creates: "{{ rke2_cli }}"
   environment:
     INSTALL_RKE2_VERSION: "{{ rke2_version }}"
     INSTALL_RKE2_TYPE: "server"

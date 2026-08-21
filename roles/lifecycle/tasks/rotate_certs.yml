@@ -14,7 +14,7 @@
 
 - name: Rotate certificates
   ansible.builtin.command:
-    cmd: "{{ rke2_bin_dir }}/rke2 certificate rotate --data-dir {{ rke2_data_dir }}"
+    cmd: "{{ rke2_cli }} certificate rotate --data-dir {{ rke2_data_dir }}"
   changed_when: true
 
 - name: Restart rke2-server

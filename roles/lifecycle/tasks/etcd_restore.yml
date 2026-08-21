@@ -16,7 +16,7 @@
 - name: Build etcd restore command
   ansible.builtin.set_fact:
     _etcd_restore_cmd: >-
-      {{ rke2_bin_dir }}/rke2 server
+      {{ rke2_cli }} server
       --cluster-reset
       --cluster-reset-restore-path={{ rke2_etcd_restore_snapshot }}
       --data-dir {{ rke2_data_dir }}
