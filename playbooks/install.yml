@@ -21,6 +21,15 @@
           actual masters in inventory ({{ groups['masters'] | length }}).
           Update rke2_master_count in group_vars/all.yml.
 
+# The HAProxy backends are the masters, so their addresses have to be known
+# before Phase 0 renders the config.
+- name: "Gather facts from all nodes"
+  hosts: masters,workers,loadbalancers
+  gather_facts: true
+  roles:
+    - role: rke2_common
+  tasks: []
+
 # Phase 0: HAProxy Load Balancers (VIP must be ready before masters)
 - name: "Phase 0: HAProxy load balancers"
   hosts: loadbalancers

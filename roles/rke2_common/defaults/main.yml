@@ -53,6 +53,14 @@ rke2_cli: "{{ rke2_install_bin_dir }}/rke2"
 rke2_killall_script: "{{ rke2_install_bin_dir }}/rke2-killall.sh"
 rke2_uninstall_script: "{{ rke2_install_bin_dir }}/rke2-uninstall.sh"
 
+# Address other nodes should reach this one on. ansible_host is the SSH
+# address, which on cloud hosts is often public while the cluster talks over
+# private addresses. Local use only - role defaults are play-scoped and do not
+# appear in hostvars[other_host]; cross-host lookups must read gathered facts.
+rke2_node_address: >-
+  {{ ansible_facts['default_ipv4']['address']
+     | default(ansible_host | default(inventory_hostname), true) }}
+
 # -----------------------------------------------------------------------------
 # Load Balancer
 # Supported types: kube-vip, external, haproxy

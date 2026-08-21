@@ -42,16 +42,19 @@
     - haproxy
     - keepalived
 
-- name: Wait for HAProxy to listen on API port
-  ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: "{{ haproxy_api_frontend_port }}"
-    delay: 5
-    timeout: 60
+# Apply any pending config change before asserting the listeners are up,
+# otherwise this checks the previous configuration.
+- name: Apply pending HAProxy and keepalived changes
+  ansible.builtin.meta: flush_handlers
 
-- name: Wait for HAProxy to listen on join port
+# 127.0.0.1, not ansible_host: the frontends bind to all addresses, and a node
+# generally cannot reach its own public address (no hairpin NAT on most clouds).
+- name: Wait for HAProxy to listen on the API and join ports
   ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: "{{ haproxy_join_frontend_port }}"
+    host: 127.0.0.1
+    port: "{{ item }}"
     delay: 2
-    timeout: 30
+    timeout: 60
+  loop:
+    - "{{ haproxy_api_frontend_port }}"
+    - "{{ haproxy_join_frontend_port }}"

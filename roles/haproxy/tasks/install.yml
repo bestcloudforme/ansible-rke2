@@ -4,21 +4,20 @@
     name:
       - haproxy
       - keepalived
-      - psmisc
-      - curl
+      - policycoreutils-python-utils   # semanage, for the API/supervisor port labels
+      - /usr/bin/curl                  # by path: bare "curl" conflicts with curl-minimal
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Install HAProxy and Keepalived (Debian)
   ansible.builtin.apt:
     name:
       - haproxy
       - keepalived
-      - psmisc
       - curl
     state: present
     update_cache: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Enable ip_nonlocal_bind for VIP
   ansible.posix.sysctl:
@@ -32,3 +31,72 @@
       value: "1"
     - key: net.ipv4.ip_forward
       value: "1"
+
+# haproxy_t may only bind ports labelled http_port_t, which covers 80/443/9000
+# but not 6443 or 9345. Without this the service exits with
+# "cannot bind socket (Permission denied)".
+- name: Label the API and supervisor ports for HAProxy (SELinux)
+  community.general.seport:
+    ports: "{{ item }}"
+    proto: tcp
+    setype: http_port_t
+    state: present
+  loop:
+    - "{{ haproxy_api_frontend_port }}"
+    - "{{ haproxy_join_frontend_port }}"
+  when:
+    - ansible_facts['os_family'] == "RedHat"
+    - ansible_facts['selinux']['status'] | default('disabled') == 'enabled'
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Open the LB ports (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - "{{ haproxy_api_frontend_port }}/tcp"
+    - "{{ haproxy_join_frontend_port }}/tcp"
+  when:
+    - ansible_facts['os_family'] == "RedHat"
+    - ansible_facts.services['firewalld.service'].state | default('stopped') == 'running'
+
+# VRRP is IP protocol 112, which the port: option cannot express.
+- name: Allow VRRP from the other load balancers (firewalld)
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family="ipv4"
+      source address="{{ hostvars[item]['ansible_facts']['default_ipv4']['address'] | default(hostvars[item]['ansible_host'] | default(item, true), true) }}/32"
+      protocol value="vrrp" accept
+    permanent: true
+    state: enabled
+    immediate: true
+  loop: "{{ groups['loadbalancers'] | reject('equalto', inventory_hostname) | list }}"
+  when:
+    - ansible_facts['os_family'] == "RedHat"
+    - ansible_facts.services['firewalld.service'].state | default('stopped') == 'running'
+
+- name: Open the LB ports (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ haproxy_api_frontend_port }}"
+    - "{{ haproxy_join_frontend_port }}"
+  when:
+    - ansible_facts['os_family'] == "Debian"
+    - ansible_facts.services['ufw.service'].state | default('stopped') == 'running'
+
+- name: Allow VRRP from the other load balancers (ufw)
+  community.general.ufw:
+    rule: allow
+    proto: any
+    src: "{{ hostvars[item]['ansible_facts']['default_ipv4']['address'] | default(hostvars[item]['ansible_host'] | default(item, true), true) }}"
+  loop: "{{ groups['loadbalancers'] | reject('equalto', inventory_hostname) | list }}"
+  when:
+    - ansible_facts['os_family'] == "Debian"
+    - ansible_facts.services['ufw.service'].state | default('stopped') == 'running'

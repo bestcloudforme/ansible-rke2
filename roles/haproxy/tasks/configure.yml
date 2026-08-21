@@ -5,6 +5,31 @@
     state: directory
     mode: '0755'
 
+# The EL unit has no RuntimeDirectory=, so /run/haproxy never exists and the
+# admin socket cannot bind. A drop-in survives reboots and keeps the SELinux
+# label right, unlike creating the directory by hand.
+- name: Create the HAProxy systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/haproxy.service.d
+    state: directory
+    mode: '0755'
+
+- name: Give HAProxy a runtime directory
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/haproxy.service.d/10-runtime-dir.conf
+    mode: '0644'
+    content: |
+      [Service]
+      RuntimeDirectory=haproxy
+      RuntimeDirectoryMode=0755
+  notify: Restart haproxy
+  register: haproxy_runtime_dir
+
+- name: Reload systemd for the HAProxy drop-in
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: haproxy_runtime_dir.changed
+
 - name: Deploy HAProxy configuration
   ansible.builtin.template:
     src: haproxy.cfg.j2
@@ -15,11 +40,12 @@
   no_log: true
   diff: false
 
-- name: Deploy API server health check script
+- name: Deploy the keepalived health check script
   ansible.builtin.template:
     src: check_apiserver.sh.j2
     dest: "{{ keepalived_check_script_path }}"
     mode: '0755'
+  notify: Restart keepalived
 
 - name: Create Keepalived config directory
   ansible.builtin.file:
