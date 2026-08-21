@@ -2,7 +2,6 @@
 - name: Install required packages (RHEL)
   ansible.builtin.dnf:
     name:
-      - curl
       - tar
       - iptables
       - conntrack-tools
@@ -10,37 +9,76 @@
       - ipset
     state: present
 
-- name: Set SELinux to permissive
+# RKE2 ships an SELinux policy (rke2-selinux, pulled in by its rpm), so
+# enforcing is supported. The default is to leave the host's setting alone
+# rather than silently weakening it.
+- name: Set SELinux state
   ansible.posix.selinux:
     policy: targeted
-    state: permissive
-  when: ansible_selinux.status | default('disabled') == 'enabled'
+    state: "{{ preflight_selinux_state }}"
+  when:
+    - preflight_selinux_state | length > 0
+    - ansible_facts['selinux']['status'] | default('disabled') == 'enabled'
 
 - name: Gather service facts
   ansible.builtin.service_facts:
 
-- name: Open firewalld ports for RKE2
+# NetworkManager claims CNI interfaces as they appear and can tear down the
+# overlay. RKE2 documents this exact file.
+- name: Keep NetworkManager off the CNI interfaces
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+    mode: '0644'
+    content: |
+      [keyfile]
+      unmanaged-devices=interface-name:cali*;interface-name:flannel*;interface-name:cilium*;interface-name:lxc*;interface-name:vxlan.calico;interface-name:vxlan-v6.calico
+  notify: Reload NetworkManager
+  when: ansible_facts.services['NetworkManager.service'] is defined
+
+# nm-cloud-setup rewrites routing from cloud metadata and breaks pod networking
+# on RHEL cloud images.
+- name: Disable nm-cloud-setup
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - nm-cloud-setup.service
+    - nm-cloud-setup.timer
+  when: ansible_facts.services[item] is defined
+
+- name: Disable firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: false
+    state: stopped
+  when:
+    - preflight_firewalld_mode == 'disable'
+    - ansible_facts.services['firewalld.service'] is defined
+
+- name: Open RKE2 ports (firewalld)
   ansible.posix.firewalld:
     port: "{{ item }}"
     permanent: true
     state: enabled
     immediate: true
-  loop:
-    - 6443/tcp    # Kubernetes API
-    - 9345/tcp    # RKE2 supervisor
-    - 2379/tcp    # etcd client
-    - 2380/tcp    # etcd peer
-    - 8472/udp    # VXLAN (Canal/Flannel)
-    - 10250/tcp   # kubelet
-    - 10255/tcp   # kubelet read-only
-    - 179/tcp     # BGP (Calico)
-  register: firewalld_result
-  when: ansible_facts.services['firewalld.service'] is defined
-  ignore_errors: true
-
-- name: Warn if firewalld port opening failed
-  ansible.builtin.debug:
-    msg: "WARNING: Could not open some firewalld ports. Check firewall configuration manually."
+  loop: "{{ _preflight_ports }}"
   when:
-    - ansible_facts.services['firewalld.service'] is defined
-    - firewalld_result.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0
+    - preflight_firewalld_mode == 'configure'
+    - ansible_facts.services['firewalld.service'].state | default('stopped') == 'running'
+
+# Pod and service traffic is not port-scoped; without the CIDRs in the trusted
+# zone, cross-node pod traffic is dropped.
+- name: Trust the cluster and service CIDRs (firewalld)
+  ansible.posix.firewalld:
+    source: "{{ item }}"
+    zone: trusted
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - "{{ rke2_cluster_cidr }}"
+    - "{{ rke2_service_cidr }}"
+  when:
+    - preflight_firewalld_mode == 'configure'
+    - ansible_facts.services['firewalld.service'].state | default('stopped') == 'running'

@@ -20,6 +20,19 @@
       rke2_cni must be canal/calico/cilium/none (got "{{ rke2_cni }}");
       rke2_lb_type must be kube-vip/external/haproxy (got "{{ rke2_lb_type }}").
 
+- name: Build the kernel module list
+  ansible.builtin.set_fact:
+    _preflight_modules: >-
+      {{ preflight_required_kernel_modules
+         + (preflight_ipvs_kernel_modules if preflight_load_ipvs_modules | bool else []) }}
+
+- name: Build the firewall port list
+  ansible.builtin.set_fact:
+    _preflight_ports: >-
+      {{ preflight_firewall_ports
+         + (preflight_firewall_ports_master if inventory_hostname in groups['masters'] | default([]) else [])
+         + (preflight_firewall_ports_cni[rke2_cni] | default([])) }}
+
 - name: Run common prerequisites
   ansible.builtin.include_tasks: common.yml
 
