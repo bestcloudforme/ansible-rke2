@@ -1,0 +1,13 @@
+---
+# Pod selector per CNI. Deliberately not namespace-scoped: RKE2 installs Calico
+# through the tigera-operator, which creates calico-node in calico-system, not
+# kube-system - and a future packaging change could move any of them again.
+cni_pod_selector:
+  canal: "k8s-app=canal"
+  calico: "k8s-app=calico-node"
+  cilium: "k8s-app=cilium"
+
+# Calico goes through an operator, so first boot has to pull the operator image,
+# have it reconcile, then pull calico-node. That routinely outruns five minutes.
+cni_wait_retries: 40
+cni_wait_delay: 15
