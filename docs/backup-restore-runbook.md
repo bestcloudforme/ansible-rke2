@@ -40,7 +40,11 @@ rke2_etcd_s3_secret_key: "{{ vault_rke2_etcd_s3_secret_key }}"
 rke2_etcd_s3_folder: "my-cluster"
 ```
 
-S3 credentials are passed via environment variables (not CLI args) for security.
+S3 credentials are passed to the snapshot command via environment variables, so
+they do not appear in `ps` output. They are also written into
+`/etc/rancher/rke2/config.yaml` (mode 0600) so RKE2's own scheduled snapshots
+reach S3 - without that, a scheduled snapshot goes to local disk no matter how
+`rke2_etcd_s3_*` is set.
 
 ### Listing Snapshots
 
@@ -84,7 +88,8 @@ ansible-playbook playbooks/etcd_restore.yml \
 
 ### What Happens During Restore
 
-1. **Validate** — Checks snapshot name is provided
+1. **Validate** — checks the snapshot name is provided and that the `rke2` CLI
+   exists on every master, while the control plane is still up
 2. **Stop ALL masters** — All rke2-server services are stopped simultaneously
 3. **Restore etcd** — Runs `rke2 server --cluster-reset` on the bootstrap master only
 4. **Start bootstrap master** — Waits for API on port 6443
@@ -107,6 +112,8 @@ If a node needs to be replaced (hardware failure, OS corruption):
    ansible-playbook playbooks/remove_node.yml \
      -i environments/my-cluster/inventory/hosts.yml \
      -e "node_name=worker-3"
+   # A dead node is fine: the play probes reachability first and skips the
+   # on-node cleanup if it cannot be reached.
    ```
 
 2. **Provision a new node** with the same OS and SSH access

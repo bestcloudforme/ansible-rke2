@@ -54,6 +54,11 @@ ansible-playbook playbooks/install.yml \
   --vault-password-file ~/.vault_pass
 ```
 
+> Overrides in `group_vars/` work because every role depends on `rke2_common`,
+> whose `defaults/main.yml` holds the shared variables at role-defaults
+> precedence. Do not load that file with a play-level `vars_files` - it would
+> outrank inventory and silently discard everything set here.
+
 ## Vault Password File
 
 For CI/CD pipelines, store the vault password in a file:

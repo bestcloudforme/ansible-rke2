@@ -19,16 +19,39 @@ Feature requests are welcome. Please open an issue describing:
 ## Pull Requests
 
 Pull requests are reviewed on a case-by-case basis. Before submitting:
-- Fork the repository
-- Create a feature branch
-- Test your changes
-- Run linting: `yamllint .` and `ansible-lint`
-- Submit a PR with a clear description
+
+- Fork the repository and create a feature branch
+- Install the collection dependencies, which `ansible-lint` needs to resolve
+  modules:
+  ```bash
+  ansible-galaxy collection install -r requirements.yml
+  ```
+- Run what CI runs:
+  ```bash
+  yamllint .
+  ansible-lint
+  ansible-playbook tests/vars-precedence.yml \
+    -i environments/ha-example/inventory/hosts.yml -c local
+  for pb in install upgrade remove_node uninstall etcd_backup \
+            etcd_restore rotate_certs fetch_kubeconfig; do
+    ansible-playbook playbooks/$pb.yml \
+      -i environments/ha-example/inventory/hosts.yml --syntax-check
+  done
+  ```
+- If you change anything that runs on a node, test it on a real cluster.
+  `docs/testing.md` describes the topology used before a release, and records
+  what is not covered.
+- Submit a PR with a clear description of what breaks without the change
 
 ## Code Style
 
-- Follow Ansible best practices
-- Use FQCN (Fully Qualified Collection Names) for all modules
-- Keep tasks idempotent
-- Add `changed_when` to command/shell tasks
-- Use `ansible.builtin.` prefix for all built-in modules
+- FQCN for every module (`ansible.builtin.*`, `ansible.posix.*`, `community.general.*`)
+- Keep tasks idempotent; `command`/`shell` tasks need `changed_when`, `creates`
+  or `removes`
+- Shared variables belong in `roles/rke2_common/defaults/main.yml`, not in a
+  play's `vars_files` — play-level `vars_files` outranks inventory `group_vars`
+  and would silently discard user overrides. `tests/vars-precedence.yml` guards
+  this
+- Cross-host lookups must read gathered facts, not role defaults: role defaults
+  are play-scoped and do not appear in `hostvars[other_host]`
+- Document any new user-facing variable in the README table
