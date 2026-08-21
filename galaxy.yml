@@ -1,7 +1,7 @@
 ---
 namespace: bestcloudforme
 name: rke2
-version: 1.2.0
+version: 2.0.0
 readme: README.md
 authors:
   - bestcloudforme
@@ -30,11 +30,17 @@ repository: https://github.com/bestcloudforme/ansible-rke2
 documentation: https://github.com/bestcloudforme/ansible-rke2/blob/main/README.md
 homepage: https://github.com/bestcloudforme/ansible-rke2
 issues: https://github.com/bestcloudforme/ansible-rke2/issues
-dependencies: {}
+dependencies:
+  ansible.posix: ">=2.2.0,<3.0.0"
+  community.general: ">=13.0.0,<14.0.0"
 build_ignore:
   - .github
+  - .ansible
   - .ansible-lint
+  - .yamllint
+  - .gitignore
+  - ansible.cfg
   - environments
-  - docs
+  - tests
   - kubeconfig.yaml
   - "*.tar.gz"

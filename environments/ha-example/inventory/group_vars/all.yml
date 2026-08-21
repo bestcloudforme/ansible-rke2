@@ -1,6 +1,6 @@
 ---
 # RKE2 HA cluster configuration
-rke2_version: "v1.32.2+rke2r1"
+rke2_version: "v1.35.7+rke2r1"
 rke2_cni: "cilium"
 rke2_master_count: 3
 
@@ -8,7 +8,7 @@ rke2_master_count: 3
 rke2_lb_type: "haproxy"
 rke2_lb_vip: "192.168.1.100"
 rke2_lb_external_host: "192.168.1.100"
-rke2_vip_interface: "eth0"
+# rke2_vip_interface: ""   # empty autodetects the default-route interface
 
 # TLS SANs - VIP and all master IPs
 rke2_server_tls_san:

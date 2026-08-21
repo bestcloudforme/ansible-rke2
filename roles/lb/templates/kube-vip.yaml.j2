@@ -1,4 +1,4 @@
-{# kube-vip RBAC + DaemonSet for RKE2 HA #}
+{# kube-vip RBAC + DaemonSet for the RKE2 control-plane VIP (ARP mode) #}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -14,7 +14,16 @@ rules:
     resources: ["leases"]
     verbs: ["list", "get", "watch", "create", "update"]
   - apiGroups: [""]
-    resources: ["services", "services/status", "nodes", "endpoints"]
+    resources: ["services", "services/status", "endpoints"]
+    verbs: ["list", "get", "watch", "update"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list", "get", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
     verbs: ["list", "get", "watch", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -69,12 +78,29 @@ spec:
           args:
             - manager
           env:
+            # cp_enable turns on the control-plane VIP. Without it the manager
+            # starts with no features enabled and never advertises the address,
+            # so joining servers cannot reach the endpoint.
+            - name: cp_enable
+              value: "true"
+            - name: cp_namespace
+              value: kube-system
+            - name: address
+              value: "{{ rke2_lb_vip }}"
+            - name: port
+              value: "6443"
             - name: vip_arp
               value: "true"
-            - name: vip_address
-              value: "{{ rke2_lb_vip }}"
+            - name: vip_subnet
+              value: "32"
+{% if rke2_vip_interface | default('') | length > 0 %}
             - name: vip_interface
-              value: "{{ rke2_vip_interface | default('eth0') }}"
+              value: "{{ rke2_vip_interface }}"
+{% endif %}
+            - name: vip_nodename
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
             - name: vip_leaderelection
               value: "true"
             - name: vip_leaseduration
@@ -92,6 +118,8 @@ spec:
               memory: 64Mi
           securityContext:
             capabilities:
+              drop:
+                - ALL
               add:
                 - NET_ADMIN
                 - NET_RAW

@@ -18,21 +18,32 @@ Production-ready Ansible playbooks for deploying RKE2 Kubernetes clusters. Suppo
 
 ## Compatibility Matrix
 
-| Component | Tested Versions |
-|-----------|----------------|
-| **Ansible** | 2.15, 2.16, 2.17 (ansible-core) |
-| **Python** | 3.9, 3.10, 3.11, 3.12 |
-| **RKE2** | v1.28.x, v1.29.x, v1.30.x, v1.31.x, v1.32.x |
-| **RHEL/Rocky/Alma** | 8.x, 9.x |
-| **Ubuntu** | 20.04, 22.04, 24.04 |
-| **Debian** | 11 (Bullseye), 12 (Bookworm) |
+| Component | Supported |
+|-----------|-----------|
+| **ansible-core** | 2.19 - 2.21 |
+| **Python (control node)** | 3.11 - 3.13 |
+| **Python (managed node)** | 3.9+ |
+| **RKE2** | v1.33.x - v1.36.x |
+| **RHEL / Rocky / AlmaLinux** | 9.x |
+| **Ubuntu** | 22.04, 24.04 |
+| **Debian** | 12 (best effort) |
+| **kube-vip** | v1.2.3 |
 
-**Required Ansible Collections:**
+`rke2_version` has no default and must be set. The RKE2 stable channel is at
+**v1.35.7+rke2r1** as of 2026-08-21; check
+[update.rke2.io](https://update.rke2.io/v1-release/channels) for the current one.
 
-| Collection | Version Range |
-|-----------|---------------|
-| `ansible.posix` | >= 1.5, < 2.0 |
-| `community.general` | >= 7.0, < 10.0 |
+**Validated on:** Rocky Linux 9.8 and Ubuntu 24.04 LTS, 3-master HA with HAProxy
+and keepalived, RKE2 v1.35.7 and v1.36.3, Canal and Calico. The `kube-vip` and
+airgap paths are implemented to spec but not covered by that testing - see
+[docs/testing.md](docs/testing.md).
+
+**Required collections:**
+
+| Collection | Version |
+|-----------|---------|
+| `ansible.posix` | >= 2.2.0, < 3.0.0 |
+| `community.general` | >= 13.0.0, < 14.0.0 |
 
 ## Quick Start
 
@@ -156,7 +167,7 @@ Execution order:
 ```bash
 ansible-playbook playbooks/upgrade.yml \
   -i environments/my-cluster/inventory/hosts.yml \
-  -e "rke2_version=v1.33.0+rke2r1"
+  -e "rke2_version=v1.36.3+rke2r1"
 ```
 
 Rolling upgrade with cordon/drain/uncordon. Masters upgraded one at a time, workers at 25%. If an upgrade fails mid-flight, the node is automatically uncordoned.
@@ -205,7 +216,7 @@ ansible-playbook playbooks/etcd_backup.yml \
 # Named snapshot
 ansible-playbook playbooks/etcd_backup.yml \
   -i environments/my-cluster/inventory/hosts.yml \
-  -e "rke2_etcd_backup_name=pre-upgrade-v1.33"
+  -e "rke2_etcd_backup_name=pre-upgrade-v1.36"
 ```
 
 S3 backup is supported — configure `rke2_etcd_s3_*` variables in `group_vars/all.yml`.
@@ -325,7 +336,7 @@ All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
 | Variable | Default | Description |
 |----------|---------|-------------|
 | **Core** | | |
-| `rke2_version` | *(required)* | RKE2 version (e.g. `v1.32.2+rke2r1`) |
+| `rke2_version` | *(required)* | RKE2 version (e.g. `v1.35.7+rke2r1`) |
 | `rke2_cni` | `canal` | CNI plugin: `canal`, `calico`, `cilium` |
 | `rke2_master_count` | `1` | Number of masters: `1` or `3` |
 | `rke2_channel` | `stable` | RKE2 release channel |
@@ -343,7 +354,7 @@ All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
 | `rke2_lb_type` | `external` | LB type: `kube-vip`, `external`, `haproxy` |
 | `rke2_lb_vip` | `""` | Virtual IP (required for kube-vip/haproxy) |
 | `rke2_lb_external_host` | `""` | External LB host (required for external) |
-| `rke2_vip_interface` | `eth0` | Network interface for VIP |
+| `rke2_vip_interface` | `""` | Interface for the VIP; empty autodetects the default-route interface |
 | `rke2_server_tls_san` | `[]` | Additional TLS SANs for API server |
 | **HAProxy** | | |
 | `haproxy_stats_password` | `changeme` | Stats page password (MUST change) |
@@ -399,7 +410,7 @@ For airgap (offline) environments:
 1. **Download artifacts** on an internet-connected machine:
    ```bash
    # Download RKE2 artifacts for your target version
-   RKE2_VERSION="v1.32.2+rke2r1"
+   RKE2_VERSION="v1.35.7+rke2r1"
    mkdir -p rke2-artifacts && cd rke2-artifacts
    curl -LO "https://github.com/rancher/rke2/releases/download/${RKE2_VERSION}/rke2-images.linux-amd64.tar.zst"
    curl -LO "https://github.com/rancher/rke2/releases/download/${RKE2_VERSION}/rke2.linux-amd64.tar.gz"
@@ -516,9 +527,9 @@ If a node becomes unresponsive:
 
 ## Requirements
 
-- Ansible >= 2.15 (ansible-core)
-- Python >= 3.9
-- Target nodes: RHEL/Rocky/AlmaLinux 8+ or Ubuntu 20.04+ or Debian 11+
+- ansible-core >= 2.19
+- Python >= 3.11 on the control node
+- Target nodes: RHEL/Rocky/AlmaLinux 9, Ubuntu 22.04/24.04, Debian 12
 - SSH access with sudo privileges
 
 ## Acknowledgements

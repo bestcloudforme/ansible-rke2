@@ -3,7 +3,7 @@ galaxy_info:
   author: bestcloudforme
   description: "OS prerequisites for RKE2 nodes"
   license: Apache-2.0
-  min_ansible_version: "2.16"
+  min_ansible_version: "2.19"
   platforms:
     - name: EL
       versions: ["all"]

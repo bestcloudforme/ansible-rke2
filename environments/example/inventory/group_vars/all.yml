@@ -1,6 +1,6 @@
 ---
 # RKE2 cluster configuration
-rke2_version: "v1.32.2+rke2r1"
+rke2_version: "v1.35.7+rke2r1"
 rke2_cni: "canal"
 rke2_master_count: 1
 
@@ -8,7 +8,7 @@ rke2_master_count: 1
 rke2_lb_type: "external"
 rke2_lb_vip: ""
 rke2_lb_external_host: "192.168.1.10"
-rke2_vip_interface: "eth0"
+# rke2_vip_interface: ""   # empty autodetects the default-route interface
 rke2_server_tls_san:
   - "192.168.1.10"
 

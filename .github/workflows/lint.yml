@@ -17,11 +17,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
           pip install \
+            "ansible-core>=2.19,<2.22" \
             "ansible-lint==26.8.*" \
             "yamllint==1.38.*"
           ansible-galaxy collection install -r requirements.yml
@@ -51,6 +52,9 @@ jobs:
               -i environments/ha-example/inventory/hosts.yml \
               --syntax-check
           done
+
+      - name: Collection builds
+        run: ansible-galaxy collection build --force --output-path /tmp/build
 
       - name: Variable precedence - group_vars must reach the roles
         run: |

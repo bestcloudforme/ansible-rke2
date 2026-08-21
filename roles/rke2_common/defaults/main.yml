@@ -72,7 +72,7 @@ rke2_lb_external_host: ""   # External LB hostname/IP (required for external)
 rke2_vip_interface: ""      # VIP interface; empty = the default-route interface
                             # (eth0 on EC2 Rocky, ens5 on EC2 Ubuntu)
 rke2_server_tls_san: []     # Additional TLS SANs for API server cert
-rke2_kube_vip_version: "v0.8.7"
+rke2_kube_vip_version: "v1.2.3"
 
 # HAProxy + Keepalived defaults are in roles/haproxy/defaults/main.yml
 # Override per-environment in group_vars/loadbalancers.yml
