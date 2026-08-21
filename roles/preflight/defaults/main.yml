@@ -2,11 +2,16 @@
 preflight_required_kernel_modules:
   - br_netfilter
   - overlay
+  - nf_conntrack
+
+# RKE2's kube-proxy runs in iptables mode, so IPVS is only needed if you switch
+# it over yourself. Appended to the list above when true.
+preflight_load_ipvs_modules: false
+preflight_ipvs_kernel_modules:
   - ip_vs
   - ip_vs_rr
   - ip_vs_wrr
   - ip_vs_sh
-  - nf_conntrack
 
 preflight_sysctl_params:
   net.bridge.bridge-nf-call-iptables: 1
@@ -15,8 +20,19 @@ preflight_sysctl_params:
   fs.inotify.max_user_watches: 524288
   fs.inotify.max_user_instances: 512
   fs.file-max: 1024000
+
+# The parameters kubelet validates under protect-kernel-defaults, which
+# profile: cis also turns on. RKE2 sets these itself at runtime only when
+# protect-kernel-defaults is off; with it on it validates instead and refuses
+# to start on a mismatch. Nothing else persists them across a reboot, so they
+# are written to /etc/sysctl.d here.
+preflight_kernel_defaults_sysctl:
   vm.overcommit_memory: 1
   vm.panic_on_oom: 0
+  kernel.panic: 10
+  kernel.panic_on_oops: 1
+  kernel.keys.root_maxkeys: 1000000
+  kernel.keys.root_maxbytes: 25000000
 
 # System resource limits
 preflight_nofile_limit: 1024000
@@ -24,3 +40,36 @@ preflight_nproc_limit: 1024000
 
 # Logrotate
 preflight_logrotate_maxsize: "250M"
+
+# SELinux. RKE2 supports enforcing on the RHEL family through the rke2-selinux
+# policy, which its rpm pulls in, so the default is to leave the host alone.
+# Set to "permissive" only if you have a policy problem you cannot solve.
+preflight_selinux_state: ""      # "", "enforcing" or "permissive"
+
+# "configure" opens the ports below and trusts the pod/service CIDRs.
+# "disable" is what RKE2 documents for the RHEL family, but turning off a
+# firewall is not something this role should decide for you. "ignore" leaves
+# firewalld entirely alone.
+preflight_firewalld_mode: "configure"    # "configure", "disable" or "ignore"
+
+preflight_firewall_ports:
+  - 6443/tcp     # Kubernetes API
+  - 9345/tcp     # RKE2 supervisor
+  - 10250/tcp    # kubelet
+  - 30000-32767/tcp   # NodePort range
+preflight_firewall_ports_master:
+  - 2379/tcp     # etcd client
+  - 2380/tcp     # etcd peer
+  - 2381/tcp     # etcd metrics
+preflight_firewall_ports_cni:
+  canal:
+    - 8472/udp   # VXLAN
+    - 9099/tcp   # health check
+  calico:
+    - 179/tcp    # BGP
+    - 5473/tcp   # Typha
+    - 9099/tcp   # health check
+  cilium:
+    - 8472/udp   # VXLAN
+    - 4240/tcp   # health check
+    - 51871/udp  # WireGuard

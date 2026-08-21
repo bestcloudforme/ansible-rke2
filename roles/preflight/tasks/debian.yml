@@ -7,7 +7,6 @@
 - name: Install required packages (Debian)
   ansible.builtin.apt:
     name:
-      - curl
       - tar
       - iptables
       - conntrack
@@ -19,27 +18,19 @@
 - name: Gather service facts
   ansible.builtin.service_facts:
 
-- name: Configure ufw firewall rules
+- name: Open RKE2 ports (ufw)
   community.general.ufw:
     rule: allow
     port: "{{ item.split('/')[0] }}"
     proto: "{{ item.split('/')[1] }}"
-  loop:
-    - 6443/tcp    # Kubernetes API
-    - 9345/tcp    # RKE2 supervisor
-    - 2379/tcp    # etcd client
-    - 2380/tcp    # etcd peer
-    - 8472/udp    # VXLAN (Canal/Flannel)
-    - 10250/tcp   # kubelet
-    - 10255/tcp   # kubelet read-only
-    - 179/tcp     # BGP (Calico)
-  register: ufw_result
-  when: ansible_facts.services['ufw.service'] is defined
-  ignore_errors: true
+  loop: "{{ _preflight_ports }}"
+  when: ansible_facts.services['ufw.service'].state | default('stopped') == 'running'
 
-- name: Warn if ufw port opening failed
-  ansible.builtin.debug:
-    msg: "WARNING: Could not open some ufw ports. Check firewall configuration manually."
-  when:
-    - ansible_facts.services['ufw.service'] is defined
-    - ufw_result.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0
+- name: Trust the cluster and service CIDRs (ufw)
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+  loop:
+    - "{{ rke2_cluster_cidr }}"
+    - "{{ rke2_service_cidr }}"
+  when: ansible_facts.services['ufw.service'].state | default('stopped') == 'running'

@@ -106,7 +106,6 @@ All RKE2 nodes require the following ports open between them:
 | 2380 | TCP | Masters only | etcd peer |
 | 8472 | UDP | All nodes | VXLAN overlay (Canal/Flannel) |
 | 10250 | TCP | All nodes | kubelet metrics |
-| 10255 | TCP | All nodes | kubelet read-only |
 | 179 | TCP | All nodes | BGP (Calico only) |
 | 4240 | TCP | All nodes | Cilium health check (Cilium only) |
 | 8090 | TCP | All nodes | Cilium Hubble (Cilium only) |
@@ -121,9 +120,17 @@ All RKE2 nodes require the following ports open between them:
 
 **Firewall handling:**
 
-- **RHEL/Rocky/Alma**: The `preflight` role opens ports via `firewalld` if the service is active. If `firewalld` is not running, ports are not managed.
-- **Ubuntu/Debian**: The `preflight` role opens ports via `ufw` if the service is active. If `ufw` is not running, ports are not managed.
-- If you use a different firewall solution, open the ports listed above manually before running the install playbook.
+- **RHEL/Rocky/Alma**: with the default `preflight_firewalld_mode: configure`, the
+  `preflight` role opens the ports above and adds `rke2_cluster_cidr` and
+  `rke2_service_cidr` to the `trusted` zone — pod traffic is not port-scoped, so
+  without that cross-node pod networking is dropped. Only applied when firewalld
+  is actually running. Set the mode to `disable` (what RKE2 documents) or
+  `ignore` to opt out.
+- **Ubuntu/Debian**: the same ports and CIDRs via `ufw`, only when ufw is running.
+- Ports are selected per node role and per CNI, so masters additionally get etcd
+  2379/2380/2381 and the CNI's own ports.
+- Load balancer nodes are handled by the `haproxy` role, not `preflight`.
+- If you use a different firewall, open the ports listed above manually.
 
 ## Playbooks
 
@@ -369,6 +376,10 @@ All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
 | `rke2_server_node_taints` | `[]` | Taints for master nodes |
 | `rke2_server_node_labels` | `[]` | Labels for master nodes |
 | `rke2_agent_node_labels` | `[]` | Labels for worker nodes |
+| **Preflight / OS** | | |
+| `preflight_selinux_state` | `""` | `enforcing`, `permissive`, or empty to leave SELinux alone |
+| `preflight_firewalld_mode` | `configure` | `configure` opens the RKE2 ports and trusts the pod/service CIDRs; `disable` stops firewalld; `ignore` leaves it alone |
+| `preflight_load_ipvs_modules` | `false` | Load the `ip_vs*` modules. RKE2's kube-proxy runs in iptables mode, so only needed if you switch it |
 | **Airgap** | | |
 | `rke2_airgap` | `false` | Enable airgap installation |
 | `rke2_airgap_images_path` | `/opt/rke2-artifacts` | Path to airgap artifacts |

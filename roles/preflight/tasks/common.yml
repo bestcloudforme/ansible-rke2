@@ -31,14 +31,14 @@
   community.general.modprobe:
     name: "{{ item }}"
     state: present
-  loop: "{{ preflight_required_kernel_modules }}"
+  loop: "{{ _preflight_modules }}"
 
 - name: Persist kernel modules across reboots
   ansible.builtin.copy:
     dest: /etc/modules-load.d/rke2.conf
     mode: '0644'
     content: |
-      {% for mod in preflight_required_kernel_modules %}
+      {% for mod in _preflight_modules %}
       {{ mod }}
       {% endfor %}
 
@@ -50,10 +50,35 @@
     reload: true
     state: present
   loop: "{{ preflight_sysctl_params | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+# kubelet validates these under protect-kernel-defaults instead of setting them,
+# and they do not survive a reboot on their own.
+- name: Persist the kernel parameters kubelet validates
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/60-rke2-cis.conf
+    reload: true
+    state: present
+  loop: "{{ preflight_kernel_defaults_sysctl | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: rke2_protect_kernel_defaults | bool or rke2_cis_profile | default('') | length > 0
+
+# RKE2 looks up both the user and the group, and only creates the group as a
+# side effect of USERGROUPS_ENAB.
+- name: Create etcd group for CIS compliance
+  ansible.builtin.group:
+    name: etcd
+    system: true
+  when: rke2_cis_profile | default('') | length > 0
 
 - name: Create etcd user for CIS compliance
   ansible.builtin.user:
     name: etcd
+    group: etcd
     system: true
     shell: /sbin/nologin
     home: /var/lib/etcd
