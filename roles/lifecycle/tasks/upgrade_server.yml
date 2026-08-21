@@ -11,7 +11,7 @@
     cmd: >
       {{ rke2_bin_dir }}/kubectl
       --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-      cordon {{ ansible_hostname | lower }}
+      cordon {{ rke2_node_name }}
   register: cordon_result
   failed_when: cordon_result.rc != 0
   delegate_to: "{{ _other_master }}"
@@ -23,7 +23,7 @@
     cmd: >
       {{ rke2_bin_dir }}/kubectl
       --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-      drain {{ ansible_hostname | lower }}
+      drain {{ rke2_node_name }}
       --ignore-daemonsets
       --delete-emptydir-data
       --timeout={{ rke2_drain_timeout }}
@@ -92,7 +92,7 @@
         cmd: >
           {{ rke2_bin_dir }}/kubectl
           --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-          get node {{ ansible_hostname | lower }}
+          get node {{ rke2_node_name }}
           -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
       register: node_ready
       until: node_ready.stdout == "True"
@@ -107,7 +107,7 @@
         cmd: >
           {{ rke2_bin_dir }}/kubectl
           --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-          uncordon {{ ansible_hostname | lower }}
+          uncordon {{ rke2_node_name }}
       delegate_to: "{{ _other_master }}"
       when: groups['masters'] | length > 1
       changed_when: true
@@ -122,7 +122,7 @@
     cmd: >
       {{ rke2_bin_dir }}/kubectl
       --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-      uncordon {{ ansible_hostname | lower }}
+      uncordon {{ rke2_node_name }}
   delegate_to: "{{ _other_master }}"
   when: groups['masters'] | length > 1
   changed_when: true

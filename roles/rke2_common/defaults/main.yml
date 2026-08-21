@@ -53,6 +53,11 @@ rke2_cli: "{{ rke2_install_bin_dir }}/rke2"
 rke2_killall_script: "{{ rke2_install_bin_dir }}/rke2-killall.sh"
 rke2_uninstall_script: "{{ rke2_install_bin_dir }}/rke2-uninstall.sh"
 
+# Kubernetes node name. RKE2 registers a node under its full hostname, which on
+# many cloud images is an FQDN - ansible_hostname truncates it and the lookup
+# then misses. Override if you set node-name in the RKE2 config.
+rke2_node_name: "{{ ansible_facts['nodename'] | lower }}"
+
 # Address other nodes should reach this one on. ansible_host is the SSH
 # address, which on cloud hosts is often public while the cluster talks over
 # private addresses. Local use only - role defaults are play-scoped and do not
