@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-08-21
+
+### Changed
+
+- **Pod Security Admission exemptions are configurable** through
+  `rke2_pod_security_exemptions`. The template hardcoded `monitoring` and
+  `logging` - permanent exemptions for namespaces that may not exist - and
+  omitted `calico-system`, which RKE2's Calico needs. If you relied on the old
+  `monitoring`/`logging` entries, set them explicitly.
+
+### Fixed
+
+- Documentation matched a repository that no longer existed. 62 mismatches, 40
+  in the README: the directory tree, the install execution order, the airgap
+  `curl` command that never produced `install.sh`, an upgrade-retry claim that
+  was never true, and a variable table missing 54 of the 113 variables the roles
+  define.
+
+### Added
+
+- `tests/docs-match-code.py`, run in CI. Fails on an undocumented variable, a
+  documented variable that does not exist, a path named in a doc that is absent,
+  or a broken relative link.
+
 ## [2.0.0] - 2026-08-21
 
 A correctness release. The collection could not deploy a cluster as documented
