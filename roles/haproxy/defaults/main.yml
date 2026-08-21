@@ -11,13 +11,30 @@ haproxy_check_interval: "3s"
 haproxy_check_fall: 3
 haproxy_check_rise: 2
 haproxy_maxconn: 3000
+haproxy_retries: 2
+
+# kubectl exec/port-forward/logs -f hold the connection open. A one minute
+# timeout severs them mid-stream.
+haproxy_timeout_client: "4h"
+haproxy_timeout_server: "4h"
+haproxy_timeout_tunnel: "4h"
 
 # Keepalived
-keepalived_vrrp_interface: "{{ rke2_vip_interface | default('eth0') }}"
+# Falls back to the default-route interface: EC2 Rocky uses eth0, Ubuntu ens5.
+keepalived_vrrp_interface: >-
+  {{ rke2_vip_interface if (rke2_vip_interface | default('') | length > 0)
+     else ansible_facts['default_ipv4']['interface'] }}
 keepalived_vrrp_id: 51
 keepalived_auth_pass: "rke2ha"
 keepalived_check_script_path: "/usr/local/bin/check_apiserver.sh"
 keepalived_check_interval: 3
-keepalived_check_weight: -2
 keepalived_check_fall: 3
 keepalived_check_rise: 2
+
+# Descending priority by inventory position, spaced so a single node can drop
+# without tying. Override per host if you want a fixed ordering.
+keepalived_priority: "{{ 150 - (groups['loadbalancers'].index(inventory_hostname) * 10) }}"
+
+# Source address for VRRP adverts. ansible_host may be a public address or a
+# name, neither of which is on the VRRP interface.
+keepalived_unicast_src_ip: "{{ ansible_facts['default_ipv4']['address'] }}"

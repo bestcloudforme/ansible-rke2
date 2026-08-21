@@ -17,11 +17,13 @@ defaults
     log                     global
     option                  tcplog
     option                  dontlognull
-    retries                 3
+    option                  redispatch
+    retries                 {{ haproxy_retries }}
     timeout queue           1m
     timeout connect         10s
-    timeout client          1m
-    timeout server          1m
+    timeout client          {{ haproxy_timeout_client }}
+    timeout server          {{ haproxy_timeout_server }}
+    timeout tunnel          {{ haproxy_timeout_tunnel }}
     timeout check           10s
     default-server init-addr last,libc,none
 
@@ -38,7 +40,7 @@ listen stats
     stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
 
 #---------------------------------------------------------------------
-# Kubernetes API Server - port {{ haproxy_api_frontend_port }}
+# Kubernetes API server - port {{ haproxy_api_frontend_port }}
 #---------------------------------------------------------------------
 frontend k8s_api
     bind *:{{ haproxy_api_frontend_port }}
@@ -48,14 +50,18 @@ frontend k8s_api
 
 backend k8s_api_backend
     mode tcp
-    option tcp-check
     balance {{ haproxy_balance_algorithm }}
+    # A TCP connect only proves the port is open. /readyz proves the apiserver
+    # is serving. RKE2 runs the apiserver with anonymous-auth=false, so an
+    # unauthenticated probe is answered with 401 - which still means healthy.
+    option httpchk GET /readyz
+    http-check expect rstatus ^(2..|401|403)$
 {% for host in groups['masters'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:6443 check inter {{ haproxy_check_interval }} fall {{ haproxy_check_fall }} rise {{ haproxy_check_rise }}
+    server {{ host }} {{ hostvars[host]['ansible_facts']['default_ipv4']['address'] | default(hostvars[host]['ansible_host'] | default(host, true), true) }}:6443 check check-ssl verify none inter {{ haproxy_check_interval }} fall {{ haproxy_check_fall }} rise {{ haproxy_check_rise }}
 {% endfor %}
 
 #---------------------------------------------------------------------
-# RKE2 Supervisor/Join API - port {{ haproxy_join_frontend_port }}
+# RKE2 supervisor / join API - port {{ haproxy_join_frontend_port }}
 #---------------------------------------------------------------------
 frontend rke2_join
     bind *:{{ haproxy_join_frontend_port }}
@@ -65,8 +71,9 @@ frontend rke2_join
 
 backend rke2_join_backend
     mode tcp
-    option tcp-check
     balance {{ haproxy_balance_algorithm }}
+    option httpchk GET /ping
+    http-check expect status 200
 {% for host in groups['masters'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:9345 check inter {{ haproxy_check_interval }} fall {{ haproxy_check_fall }} rise {{ haproxy_check_rise }}
+    server {{ host }} {{ hostvars[host]['ansible_facts']['default_ipv4']['address'] | default(hostvars[host]['ansible_host'] | default(host, true), true) }}:9345 check check-ssl verify none inter {{ haproxy_check_interval }} fall {{ haproxy_check_fall }} rise {{ haproxy_check_rise }}
 {% endfor %}
