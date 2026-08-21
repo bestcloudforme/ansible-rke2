@@ -18,13 +18,18 @@
 - name: Gather service facts
   ansible.builtin.service_facts:
 
+# Gated on ufw being installed, not on it being active: service_facts reports a
+# oneshot unit as 'stopped' even when it has run, and ufw records rules while
+# inactive anyway - which is what stops a later `ufw enable` locking the cluster
+# out.
 - name: Open RKE2 ports (ufw)
   community.general.ufw:
     rule: allow
-    port: "{{ item.split('/')[0] }}"
+    # ufw writes port ranges with a colon; firewalld uses a hyphen.
+    port: "{{ item.split('/')[0] | replace('-', ':') }}"
     proto: "{{ item.split('/')[1] }}"
   loop: "{{ _preflight_ports }}"
-  when: ansible_facts.services['ufw.service'].state | default('stopped') == 'running'
+  when: ansible_facts.services['ufw.service'] is defined
 
 - name: Trust the cluster and service CIDRs (ufw)
   community.general.ufw:
@@ -33,4 +38,4 @@
   loop:
     - "{{ rke2_cluster_cidr }}"
     - "{{ rke2_service_cidr }}"
-  when: ansible_facts.services['ufw.service'].state | default('stopped') == 'running'
+  when: ansible_facts.services['ufw.service'] is defined

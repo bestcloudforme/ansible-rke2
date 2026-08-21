@@ -19,13 +19,48 @@
       If the Ansible inventory hostname differs from the Kubernetes node name,
       pass both: -e "node_name=<k8s-name> target_host=<inventory-hostname>"
 
+- name: Refuse to remove the host this play is running from
+  ansible.builtin.assert:
+    that:
+      - _remove_target != inventory_hostname
+    fail_msg: >-
+      remove_node runs kubectl from {{ inventory_hostname }}, so it cannot also
+      uninstall it. Point the play at another master.
+
+# Removing a master costs etcd a member. Two masters minus one is not a quorum.
+- name: Refuse to break etcd quorum
+  ansible.builtin.assert:
+    that:
+      - (groups['masters'] | length - 1) >= 2
+    fail_msg: >-
+      Removing {{ _remove_target }} would leave {{ groups['masters'] | length - 1 }}
+      control-plane node(s). etcd needs at least 3 for quorum. Add a replacement
+      first, or set rke2_allow_quorum_loss=true if you know what you are doing.
+  when:
+    - _remove_target in (groups['masters'] | default([]))
+    - not (rke2_allow_quorum_loss | default(false) | bool)
+
+# The usual reason to remove a node is that it died, so nothing here may depend
+# on it being reachable, and every step has to tolerate having already run.
+- name: Check whether the node is still reachable
+  ansible.builtin.wait_for_connection:
+    timeout: 15
+  delegate_to: "{{ _remove_target }}"
+  register: node_reachable
+  ignore_errors: true
+  ignore_unreachable: true
+
 - name: Cordon node
   ansible.builtin.command:
     cmd: >
       {{ rke2_bin_dir }}/kubectl
       --kubeconfig {{ rke2_config_dir }}/rke2.yaml
       cordon {{ node_name }}
-  changed_when: true
+  register: cordon_result
+  changed_when: cordon_result.rc == 0
+  failed_when:
+    - cordon_result.rc != 0
+    - '"NotFound" not in cordon_result.stderr'
 
 - name: Drain node
   ansible.builtin.command:
@@ -35,8 +70,13 @@
       drain {{ node_name }}
       --ignore-daemonsets
       --delete-emptydir-data
+      {{ '--force' if rke2_drain_force | bool else '' }}
       --timeout={{ rke2_drain_timeout }}
-  changed_when: true
+  register: drain_result
+  changed_when: drain_result.rc == 0
+  failed_when:
+    - drain_result.rc != 0
+    - '"NotFound" not in drain_result.stderr'
 
 - name: Delete node from cluster
   ansible.builtin.command:
@@ -44,18 +84,40 @@
       {{ rke2_bin_dir }}/kubectl
       --kubeconfig {{ rke2_config_dir }}/rke2.yaml
       delete node {{ node_name }}
-  changed_when: true
+  register: delete_result
+  changed_when: delete_result.rc == 0
+  failed_when:
+    - delete_result.rc != 0
+    - '"NotFound" not in delete_result.stderr'
 
-- name: Run rke2-killall on removed node
-  ansible.builtin.command:
-    cmd: "{{ rke2_killall_script }}"
+- name: Clean up the removed node
+  when: node_reachable is not failed and node_reachable is not unreachable
   delegate_to: "{{ _remove_target }}"
-  ignore_errors: true
-  changed_when: true
+  vars:
+    _target_bin_dir: >-
+      {{ '/usr/bin'
+         if hostvars[_remove_target]['ansible_facts']['os_family'] | default('') == 'RedHat'
+         else '/usr/local/bin' }}
+  block:
+    # Resolved from the TARGET's facts: rke2_install_bin_dir depends on its OS
+    # family, not on the control master's.
+    - name: Run rke2-killall on removed node
+      ansible.builtin.command:
+        cmd: "{{ _target_bin_dir }}/rke2-killall.sh"
+      register: killall_result
+      changed_when: killall_result.rc == 0
+      failed_when: false
 
-- name: Run rke2-uninstall on removed node
-  ansible.builtin.command:
-    cmd: "{{ rke2_uninstall_script }}"
-  delegate_to: "{{ _remove_target }}"
-  ignore_errors: true
-  changed_when: true
+    - name: Run rke2-uninstall on removed node
+      ansible.builtin.command:
+        cmd: "{{ _target_bin_dir }}/rke2-uninstall.sh"
+      register: uninstall_result
+      changed_when: uninstall_result.rc == 0
+      failed_when: false
+
+- name: Warn that the node could not be cleaned up
+  ansible.builtin.debug:
+    msg: >-
+      {{ _remove_target }} was unreachable, so RKE2 was not uninstalled on it.
+      It has been removed from the cluster. Wipe the host before adding it back.
+  when: node_reachable is failed or node_reachable is unreachable

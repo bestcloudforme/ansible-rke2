@@ -59,14 +59,6 @@ rke2_node_name: "{{ ansible_facts['nodename'] | lower }}"
 rke2_node_ip: ""            # node-ip, for multi-NIC hosts (empty = RKE2 default)
 rke2_node_external_ip: ""   # node-external-ip
 
-# Address other nodes should reach this one on. ansible_host is the SSH
-# address, which on cloud hosts is often public while the cluster talks over
-# private addresses. Local use only - role defaults are play-scoped and do not
-# appear in hostvars[other_host]; cross-host lookups must read gathered facts.
-rke2_node_address: >-
-  {{ ansible_facts['default_ipv4']['address']
-     | default(ansible_host | default(inventory_hostname), true) }}
-
 # -----------------------------------------------------------------------------
 # Load Balancer
 # Supported types: kube-vip, external, haproxy
@@ -77,7 +69,8 @@ rke2_node_address: >-
 rke2_lb_type: "external"    # kube-vip, external, or haproxy
 rke2_lb_vip: ""             # Virtual IP (required for kube-vip/haproxy)
 rke2_lb_external_host: ""   # External LB hostname/IP (required for external)
-rke2_vip_interface: "eth0"  # Network interface for VIP
+rke2_vip_interface: ""      # VIP interface; empty = the default-route interface
+                            # (eth0 on EC2 Rocky, ens5 on EC2 Ubuntu)
 rke2_server_tls_san: []     # Additional TLS SANs for API server cert
 rke2_kube_vip_version: "v0.8.7"
 
@@ -88,6 +81,17 @@ rke2_kube_vip_version: "v0.8.7"
 # Lifecycle Management
 # -----------------------------------------------------------------------------
 rke2_drain_timeout: "300s"
+rke2_drain_force: true      # Evict bare pods; a drain without it stalls on any unmanaged pod
+rke2_api_ready_timeout: 600 # Seconds to wait for the apiserver after a restart
+rke2_service_start_retries: 30
+
+# The install script runs as root, so it must not sit in a world-writable
+# directory where an unprivileged user could pre-create it.
+rke2_install_script: "/root/.rke2-install.sh"
+
+# Controller-side directory holding the tarballs for rke2_version. Required for
+# an airgap UPGRADE; leave empty if you stage them on the nodes yourself.
+rke2_airgap_local_artifacts: ""
 rke2_upgrade_serial: 1
 rke2_upgrade_agent_serial: "25%"
 rke2_reboot_after_uninstall: false

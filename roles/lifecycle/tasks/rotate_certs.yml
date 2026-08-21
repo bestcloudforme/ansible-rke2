@@ -12,22 +12,29 @@
   ansible.builtin.debug:
     msg: "API server cert: {{ cert_expiry.stdout | default('not found') }}"
 
+# RKE2 documents stop, rotate, start. Rotating under a running server leaves it
+# holding the superseded certificates until something restarts it.
+- name: Stop rke2-server before rotating
+  ansible.builtin.systemd:
+    name: rke2-server
+    state: stopped
+
 - name: Rotate certificates
   ansible.builtin.command:
     cmd: "{{ rke2_cli }} certificate rotate --data-dir {{ rke2_data_dir }}"
   changed_when: true
 
-- name: Restart rke2-server
-  ansible.builtin.systemd:
-    name: rke2-server
-    state: restarted
+- name: Start rke2-server
+  ansible.builtin.include_tasks: start_rke2.yml
+  vars:
+    rke2_service_name: rke2-server
 
 - name: Wait for Kubernetes API to be ready
   ansible.builtin.wait_for:
-    host: localhost
+    host: 127.0.0.1
     port: 6443
     delay: 15
-    timeout: 300
+    timeout: "{{ rke2_api_ready_timeout }}"
 
 - name: Verify node is Ready
   ansible.builtin.command:

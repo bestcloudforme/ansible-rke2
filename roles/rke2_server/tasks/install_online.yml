@@ -7,13 +7,13 @@
 - name: Download RKE2 install script
   ansible.builtin.get_url:
     url: https://get.rke2.io
-    dest: /tmp/rke2-install.sh
-    mode: '0755'
+    dest: "{{ rke2_install_script }}"
+    mode: '0700'
   when: not rke2_binary.stat.exists
 
 - name: Install RKE2 server
   ansible.builtin.command:
-    cmd: /tmp/rke2-install.sh
+    cmd: "{{ rke2_install_script }}"
     creates: "{{ rke2_cli }}"
   environment:
     INSTALL_RKE2_VERSION: "{{ rke2_version }}"

@@ -29,4 +29,4 @@
     mode: '0600'
   no_log: true
   diff: false
-  notify: Restart rke2-agent
+  notify: restart rke2-agent

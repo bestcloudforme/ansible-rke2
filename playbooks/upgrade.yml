@@ -5,52 +5,84 @@
   roles:
     - role: rke2_common
   tasks:
+    - name: Validate rke2_version is set
+      ansible.builtin.assert:
+        that:
+          - rke2_version | default('') | length > 0
+        fail_msg: >-
+          rke2_version must be set. Without it the install script resolves the
+          channel and silently upgrades every node to whatever is current.
+
     - name: Check current RKE2 version
       ansible.builtin.command:
         cmd: "{{ rke2_cli }} --version"
       register: current_version
       changed_when: false
-      ignore_errors: true
+      failed_when: false
 
     - name: Show upgrade plan
       ansible.builtin.debug:
-        msg: "Current: {{ current_version.stdout | default('not installed') }} -> Target: {{ rke2_version }}"
+        msg: >-
+          {{ inventory_hostname }}:
+          {{ current_version.stdout_lines[0] | default('not installed') }}
+          -> {{ rke2_version }}
 
+    # Kubernetes supports one minor at a time. A bigger jump leaves the cluster
+    # unable to complete the upgrade.
+    - name: Refuse to skip a minor version
+      ansible.builtin.assert:
+        that:
+          - (_target_minor | int) - (_current_minor | int) <= 1
+          - (_target_minor | int) - (_current_minor | int) >= 0
+        fail_msg: >-
+          {{ inventory_hostname }} is on
+          {{ current_version.stdout_lines[0] | default('unknown') }} and the target is
+          {{ rke2_version }}. Kubernetes supports one minor version at a time and
+          does not support downgrades - step through the minors.
+      vars:
+        _target_minor: "{{ (rke2_version | regex_search('v[0-9]+[.][0-9]+')).split('.')[1] }}"
+        _current_minor: "{{ (current_version.stdout | regex_search('v[0-9]+[.][0-9]+')).split('.')[1] }}"
+      when:
+        - current_version.rc == 0
+        - current_version.stdout | regex_search('v[0-9]+[.][0-9]+') is not none
+
+# haproxy.cfg lists the masters as backends, so their addresses have to be in
+# hostvars before the template renders.
+- name: "Gather facts from all nodes"
+  hosts: masters,workers,loadbalancers
+  gather_facts: true
+  roles:
+    - role: rke2_common
+  tasks: []
+
+# Rendered through the role, not inline: haproxy.cfg.j2 reads haproxy_* role
+# defaults, which are not in scope for a bare template task - and no_log hid the
+# resulting undefined-variable error.
 - name: "Re-template HAProxy config"
   hosts: loadbalancers
   become: true
+  force_handlers: true
   roles:
-    - role: rke2_common
-  tasks:
-    - name: Update HAProxy configuration
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/../roles/haproxy/templates/haproxy.cfg.j2"
-        dest: /etc/haproxy/haproxy.cfg
-        mode: '0644'
-        validate: haproxy -c -f %s
-      notify: Reload haproxy
+    - role: haproxy
       when: rke2_lb_type | default('external') == 'haproxy'
-      no_log: true
-      diff: false
-  handlers:
-    - name: Reload haproxy
-      ansible.builtin.systemd:
-        name: haproxy
-        state: reloaded
 
 - name: "Upgrade masters (serial: {{ rke2_upgrade_serial | default(1) }})"
   hosts: masters
   become: true
   serial: "{{ rke2_upgrade_serial }}"
+  any_errors_fatal: true
   roles:
     - role: lifecycle
   vars:
     lifecycle_action: upgrade_server
 
+# Stop after the first failed batch instead of marching a bad upgrade through
+# every remaining worker.
 - name: "Upgrade workers (serial: {{ rke2_upgrade_agent_serial | default('25%') }})"
   hosts: workers
   become: true
   serial: "{{ rke2_upgrade_agent_serial }}"
+  max_fail_percentage: 0
   roles:
     - role: lifecycle
   vars:

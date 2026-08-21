@@ -1,0 +1,37 @@
+---
+# An airgap upgrade re-runs install.sh against rke2_airgap_images_path. Nothing
+# put the NEW tarballs there, so the upgrade silently reinstalled the version
+# already staged: the play reported success and kubectl get nodes still showed
+# the old version. Stage first, then prove the staged artifacts match the target
+# before the service is stopped.
+
+- name: Copy new airgap artifacts to the node
+  ansible.builtin.copy:
+    src: "{{ rke2_airgap_local_artifacts }}/"
+    dest: "{{ rke2_airgap_images_path }}/"
+    mode: '0644'
+  when: rke2_airgap_local_artifacts | length > 0
+
+- name: Read the staged checksum file
+  ansible.builtin.slurp:
+    src: "{{ rke2_airgap_images_path }}/sha256sum-amd64.txt"
+  register: staged_checksums
+
+- name: Staged artifacts must match rke2_version
+  ansible.builtin.assert:
+    that:
+      - rke2_version | replace('+', '%2B') in (staged_checksums.content | b64decode)
+        or rke2_version in (staged_checksums.content | b64decode)
+    fail_msg: >-
+      The artifacts staged at {{ rke2_airgap_images_path }} are not
+      {{ rke2_version }}. Re-running install.sh against them would reinstall the
+      version already there and report success. Set
+      rke2_airgap_local_artifacts to a directory holding the {{ rke2_version }}
+      tarballs, or stage them on the node yourself.
+
+- name: Copy RKE2 install script from airgap artifacts
+  ansible.builtin.copy:
+    src: "{{ rke2_airgap_images_path }}/install.sh"
+    dest: "{{ rke2_install_script }}"
+    mode: '0700'
+    remote_src: true

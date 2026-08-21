@@ -58,13 +58,6 @@
     mode: '0600'
   when: rke2_cni == 'cilium'
 
-- name: Create audit log directory
-  ansible.builtin.file:
-    path: /var/log/kubernetes/audit
-    state: directory
-    mode: '0750'
-  when: rke2_audit_policy_enabled | default(false) | bool
-
 - name: Deploy audit policy
   ansible.builtin.template:
     src: audit-policy.yaml.j2
@@ -86,4 +79,4 @@
     mode: '0600'
   no_log: true
   diff: false
-  notify: Restart rke2-server
+  notify: restart rke2-server

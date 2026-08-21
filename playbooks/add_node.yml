@@ -46,6 +46,15 @@
     - role: rke2_server
       when: (node_role | default('worker')) == 'master'
 
+# haproxy.cfg lists the masters as backends, so their addresses have to be in
+# hostvars before the template renders.
+- name: "Gather facts from all nodes"
+  hosts: masters,workers,loadbalancers
+  gather_facts: true
+  roles:
+    - role: rke2_common
+  tasks: []
+
 - name: "Update HAProxy backends"
   hosts: loadbalancers
   become: true
