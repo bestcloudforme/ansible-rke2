@@ -19,14 +19,14 @@
 - name: Copy RKE2 install script from airgap artifacts
   ansible.builtin.copy:
     src: "{{ rke2_airgap_images_path }}/install.sh"
-    dest: /tmp/rke2-install.sh
-    mode: '0755'
+    dest: "{{ rke2_install_script }}"
+    mode: '0700'
     remote_src: true
   when: not rke2_binary.stat.exists
 
 - name: Install RKE2 agent (airgap)
   ansible.builtin.command:
-    cmd: /tmp/rke2-install.sh
+    cmd: "{{ rke2_install_script }}"
     creates: "{{ rke2_cli }}"
   environment:
     INSTALL_RKE2_VERSION: "{{ rke2_version }}"

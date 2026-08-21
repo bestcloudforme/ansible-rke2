@@ -37,15 +37,24 @@
 
 # nm-cloud-setup rewrites routing from cloud metadata and breaks pod networking
 # on RHEL cloud images.
-- name: Disable nm-cloud-setup
-  ansible.builtin.systemd:
-    name: "{{ item }}"
-    enabled: false
-    state: stopped
+# service_facts does not report .timer units, so the unit files are checked
+# directly. Leaving the timer armed lets it re-enable the service on reboot.
+- name: Look for the nm-cloud-setup units
+  ansible.builtin.stat:
+    path: "/usr/lib/systemd/system/{{ item }}"
   loop:
     - nm-cloud-setup.service
     - nm-cloud-setup.timer
-  when: ansible_facts.services[item] is defined
+  register: nm_cloud_units
+
+- name: Disable nm-cloud-setup
+  ansible.builtin.systemd:
+    name: "{{ item.item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ nm_cloud_units.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
 
 - name: Disable firewalld
   ansible.builtin.systemd:

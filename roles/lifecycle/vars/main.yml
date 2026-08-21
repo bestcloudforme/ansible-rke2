@@ -1,0 +1,12 @@
+---
+# Environment for the RKE2 install script. INSTALL_RKE2_CHANNEL is only
+# consulted when no explicit version is given, and an airgap install must not
+# reach for a channel at all.
+_rke2_install_env: >-
+  {{
+    {'INSTALL_RKE2_VERSION': rke2_version,
+     'INSTALL_RKE2_TYPE': _rke2_install_type}
+    | combine({'INSTALL_RKE2_ARTIFACT_PATH': rke2_airgap_images_path} if rke2_airgap | bool else
+              {'INSTALL_RKE2_CHANNEL': rke2_channel})
+  }}
+_rke2_install_type: "{{ 'server' if lifecycle_action == 'upgrade_server' else 'agent' }}"

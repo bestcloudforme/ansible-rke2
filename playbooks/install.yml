@@ -12,6 +12,28 @@
           - rke2_version | default('') | length > 0
         fail_msg: "rke2_version must be set in group_vars/all.yml (e.g. v1.32.2+rke2r1)"
 
+    # Every day-2 playbook drives kubectl from masters[0], and the agents read
+    # the join token from it. A bootstrap flag on any other master leaves that
+    # host waiting to join a cluster that does not exist yet.
+    - name: Exactly one master must be the bootstrap node, and it must be the first
+      ansible.builtin.assert:
+        that:
+          - groups['masters'] | map('extract', hostvars, 'rke2_bootstrap')
+            | select('defined') | select('true') | list | length == 1
+          - hostvars[groups['masters'][0]]['rke2_bootstrap'] | default(false) | bool
+        fail_msg: >-
+          Set rke2_bootstrap: true on exactly one master, and make it the first
+          host in the masters group. Currently first={{ groups['masters'][0] }}.
+
+    - name: A host cannot be both a master and a worker
+      ansible.builtin.assert:
+        that:
+          - groups['masters'] | intersect(groups['workers'] | default([])) | length == 0
+        fail_msg: >-
+          {{ groups['masters'] | intersect(groups['workers'] | default([])) | join(', ') }}
+          appear in both masters and workers. Phase 5 would overwrite the server
+          config with an agent config.
+
     - name: Validate rke2_master_count matches inventory
       ansible.builtin.assert:
         that:

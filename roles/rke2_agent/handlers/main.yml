@@ -1,6 +1,25 @@
 ---
+# Two handlers on one `listen` topic rather than a bare `state: restarted`.
+# On a small node the apiserver can outrun RKE2's own readiness deadline: RKE2
+# shuts itself down, systemd's Restart=always brings it back, and the second
+# attempt succeeds. `state: restarted` reports that first failure and aborts the
+# play even though the service ends up healthy.
 - name: Restart rke2-agent
   ansible.builtin.systemd:
     name: rke2-agent
     state: restarted
     daemon_reload: true
+  register: rke2_agent_restart
+  failed_when: false
+  listen: restart rke2-agent
+
+- name: Wait for rke2-agent to become active  # noqa command-instead-of-module
+  ansible.builtin.command:
+    cmd: systemctl is-active rke2-agent
+  register: rke2_agent_active
+  until: rke2_agent_active.stdout | trim == 'active'
+  retries: "{{ rke2_service_start_retries }}"
+  delay: 10
+  changed_when: false
+  failed_when: rke2_agent_active.stdout | trim != 'active'
+  listen: restart rke2-agent

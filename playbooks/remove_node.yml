@@ -6,6 +6,18 @@
 # If the Kubernetes node name differs from the Ansible inventory hostname:
 #   ansible-playbook remove_node.yml -e "node_name=k8s-worker-3 target_host=worker-3.example.com"
 
+# The cleanup step resolves the uninstall scripts from the TARGET's OS family,
+# and haproxy.cfg lists the masters as backends, so both need facts in hostvars
+# before anything runs. Unreachable hosts are expected here: the usual reason to
+# remove a node is that it died.
+- name: "Gather facts from all nodes"
+  hosts: masters,workers,loadbalancers
+  gather_facts: true
+  ignore_unreachable: true
+  roles:
+    - role: rke2_common
+  tasks: []
+
 - name: "Remove node from cluster"
   hosts: masters[0]
   become: true
@@ -17,6 +29,7 @@
 - name: "Update HAProxy backends after master removal"
   hosts: loadbalancers
   become: true
+  force_handlers: true
   roles:
     - role: haproxy
       when:

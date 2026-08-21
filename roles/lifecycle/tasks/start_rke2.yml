@@ -1,0 +1,25 @@
+---
+# On a small node the apiserver can outrun RKE2's own readiness deadline. RKE2
+# then shuts itself down and systemd's Restart=always brings it back, and the
+# second attempt succeeds - but a plain `state: restarted` reports the first
+# failure and aborts the play. Start it, then wait for it to settle.
+- name: Start the RKE2 service - {{ rke2_service_name }}
+  ansible.builtin.systemd:
+    name: "{{ rke2_service_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  register: rke2_start
+  failed_when: false
+
+# noqa: command-instead-of-module - the systemd module is what cannot be used
+# here: it reports the transient failure this task exists to ride out.
+- name: Wait for the RKE2 service to become active - {{ rke2_service_name }}  # noqa command-instead-of-module
+  ansible.builtin.command:
+    cmd: systemctl is-active {{ rke2_service_name }}
+  register: rke2_active
+  until: rke2_active.stdout | trim == 'active'
+  retries: "{{ rke2_service_start_retries }}"
+  delay: 10
+  changed_when: false
+  failed_when: rke2_active.stdout | trim != 'active'

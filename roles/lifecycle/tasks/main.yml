@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - lifecycle_action in ['upgrade_server', 'upgrade_agent', 'uninstall',
-                              'remove_node', 'etcd_backup', 'etcd_restore',
+                              'remove_node', 'etcd_backup',
                               'rotate_certs', 'rotate_certs_agent']
     fail_msg: "Invalid lifecycle_action: {{ lifecycle_action }}"
 
@@ -11,7 +11,7 @@
   ansible.builtin.stat:
     path: "{{ rke2_cli }}"
   register: rke2_cli_stat
-  when: lifecycle_action in ['etcd_backup', 'etcd_restore', 'rotate_certs']
+  when: lifecycle_action in ['etcd_backup', 'rotate_certs']
 
 - name: Validate the rke2 CLI is present
   ansible.builtin.assert:
@@ -22,7 +22,7 @@
       rke2 CLI not found at {{ rke2_cli }}. get.rke2.io installs it under
       /usr/bin on RHEL-family (rpm) and /usr/local/bin elsewhere (tarball).
       Set rke2_install_bin_dir if you installed it somewhere else.
-  when: lifecycle_action in ['etcd_backup', 'etcd_restore', 'rotate_certs']
+  when: lifecycle_action in ['etcd_backup', 'rotate_certs']
 
 - name: Run lifecycle action
   ansible.builtin.include_tasks: "{{ lifecycle_action }}.yml"
