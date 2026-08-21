@@ -46,11 +46,16 @@ example inventories.
 - **CIS sysctls change host behaviour**: `kernel.panic=10` and
   `kernel.panic_on_oops=1` mean the node reboots on an oops. Applied only when
   `rke2_protect_kernel_defaults` or `rke2_cis_profile` is set.
+- **Pod Security Admission exemptions are configurable** via
+  `rke2_pod_security_exemptions`. The template hardcoded `monitoring` and
+  `logging` - permanent holes in the policy for namespaces that may not exist -
+  and omitted `calico-system`, which RKE2's Calico needs.
 - **`ip_vs*` modules are no longer loaded by default.** Set
   `preflight_load_ipvs_modules: true` if you run kube-proxy in IPVS mode.
 - **SELinux is no longer forced to permissive.** `preflight_selinux_state` is
   empty by default and leaves the host alone.
-- **`eksd_version` removed** - nothing ever read it.
+- **`eksd_version` removed** - nothing ever read it. `rke2_node_address` was
+  added and removed within this release and never shipped.
 
 ### Fixed
 
@@ -80,7 +85,8 @@ example inventories.
   stopping the service. They reinstalled the old version and reported success.
 - `remove_node` works on a dead node, is re-runnable, and refuses to break etcd
   quorum.
-- `uninstall` fails instead of reporting success when the scripts are missing.
+- `uninstall` fails instead of reporting success when the scripts are missing,
+  and removes the HAProxy systemd drop-in and SELinux port labels the role adds.
 - etcd S3 settings reach the server config. Scheduled snapshots went to local
   disk regardless of `rke2_etcd_s3_*`.
 - Audit records reach the host. `audit-policy-file` is a first-class RKE2 key;
@@ -96,13 +102,18 @@ example inventories.
 
 - `roles/rke2_common` - shared defaults, a dependency of every role.
 - `tests/vars-precedence.yml`, run in CI.
-- `meta/runtime.yml` and `meta/main.yml` for every role.
+- `meta/runtime.yml`, and a `meta/main.yml` for every role.
 - `docs/testing.md` - what is tested on real hosts and what is not.
 - Preflight asserts for `rke2_cis_profile`, `rke2_cni`, `rke2_lb_type`, a single
   bootstrap master, and masters/workers overlap.
 - `rke2_node_name`, `rke2_node_ip`, `rke2_node_external_ip`, `rke2_selinux`,
-  `rke2_audit_log_dir`, `rke2_drain_force`, `rke2_install_bin_dir`,
-  `preflight_selinux_state`, `preflight_firewalld_mode`.
+  `rke2_audit_log_dir`, `rke2_drain_force`, `rke2_install_bin_dir`, `rke2_cli`,
+  `rke2_install_script`, `rke2_airgap_local_artifacts`, `rke2_api_ready_timeout`,
+  `rke2_service_start_retries`, `rke2_pod_security_exemptions`,
+  `preflight_selinux_state`, `preflight_firewalld_mode`,
+  `preflight_load_ipvs_modules`, `cni_pod_selector`, `cni_wait_retries`,
+  `haproxy_retries`, `haproxy_timeout_*`, `keepalived_priority`,
+  `keepalived_unicast_src_ip`. The README table now lists every one.
 - Firewall ports selected per node role and per CNI, plus the pod and service
   CIDRs in the trusted zone.
 

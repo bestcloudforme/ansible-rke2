@@ -15,8 +15,6 @@ plugins:
         warn-version: "latest"
       exemptions:
         namespaces:
-          - kube-system
-          - kube-public
-          - kube-node-lease
-          - monitoring
-          - logging
+{% for ns in rke2_pod_security_exemptions %}
+          - {{ ns }}
+{% endfor %}

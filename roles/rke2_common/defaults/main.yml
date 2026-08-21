@@ -118,6 +118,17 @@ rke2_audit_log_maxsize: 100
 # Pod Security Admission (restricted, baseline, privileged, or empty)
 rke2_pod_security_admission: ""
 
+# Namespaces exempt from PSA enforcement. The control-plane namespaces plus the
+# ones RKE2's own charts use - Calico's operator needs privileged pods. Add your
+# own rather than editing the template; a namespace listed here is exempt
+# forever, so keep the list short.
+rke2_pod_security_exemptions:
+  - kube-system
+  - kube-public
+  - kube-node-lease
+  - calico-system
+  - tigera-operator
+
 # kubelet resource reservations
 rke2_kube_reserved_cpu: ""          # e.g. "500m"
 rke2_kube_reserved_memory: ""       # e.g. "512Mi"

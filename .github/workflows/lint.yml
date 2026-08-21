@@ -53,6 +53,9 @@ jobs:
               --syntax-check
           done
 
+      - name: Docs match the code
+        run: python3 tests/docs-match-code.py
+
       - name: Collection builds
         run: ansible-galaxy collection build --force --output-path /tmp/build
 
