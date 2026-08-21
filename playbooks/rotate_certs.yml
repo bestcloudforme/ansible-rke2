@@ -10,8 +10,6 @@
   hosts: masters
   become: true
   serial: 1
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:
@@ -21,8 +19,6 @@
   hosts: workers
   become: true
   serial: "{{ rke2_upgrade_agent_serial | default('25%') }}"
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:

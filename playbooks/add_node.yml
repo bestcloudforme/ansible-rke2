@@ -17,8 +17,8 @@
 - name: "Fetch token from bootstrap master"
   hosts: masters[0]
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Read cluster join token
       ansible.builtin.slurp:
@@ -29,16 +29,12 @@
 - name: "Preflight on new node"
   hosts: "{{ target_hosts | default([]) }}"
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: preflight
 
 - name: "Join new worker node"
   hosts: "{{ target_hosts | default([]) }}"
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: rke2_agent
       when: (node_role | default('worker')) == 'worker'
@@ -46,8 +42,6 @@
 - name: "Join new master node"
   hosts: "{{ target_hosts | default([]) }}"
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: rke2_server
       when: (node_role | default('worker')) == 'master'
@@ -55,8 +49,6 @@
 - name: "Update HAProxy backends"
   hosts: loadbalancers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: haproxy
       when:

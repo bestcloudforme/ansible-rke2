@@ -52,6 +52,12 @@ jobs:
               --syntax-check
           done
 
+      - name: Variable precedence - group_vars must reach the roles
+        run: |
+          ansible-playbook tests/vars-precedence.yml \
+            -i environments/ha-example/inventory/hosts.yml \
+            -c local
+
       - name: Syntax check - add_node (requires runtime variable)
         run: |
           ansible-playbook playbooks/add_node.yml \

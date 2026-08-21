@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  author: bestcloudforme
+  description: "Day-2 operations: upgrade, node removal, uninstall, backup, cert rotation"
+  license: Apache-2.0
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions: ["all"]
+    - name: Ubuntu
+      versions: ["all"]
+    - name: Debian
+      versions: ["all"]
+  galaxy_tags: [rke2, kubernetes, rancher]
+dependencies:
+  - role: rke2_common

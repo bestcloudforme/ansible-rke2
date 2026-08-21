@@ -1,0 +1,49 @@
+---
+# Guards against reintroducing play-level vars_files for the shared defaults.
+#
+# Play vars_files outrank inventory group_vars, so loading the defaults that way
+# silently discards every per-environment override. --syntax-check cannot detect
+# it: the playbooks parse fine while resolving to the wrong values.
+#
+#   ansible-playbook tests/vars-precedence.yml \
+#     -i environments/ha-example/inventory/hosts.yml -c local
+
+- name: "group_vars must override the shared role defaults"
+  hosts: masters
+  gather_facts: false
+  connection: local
+  become: false
+  roles:
+    - role: rke2_common
+  tasks:
+    - name: Values from ha-example group_vars reach the roles
+      ansible.builtin.assert:
+        that:
+          - rke2_version == "v1.32.2+rke2r1"
+          - rke2_cni == "cilium"
+          - rke2_master_count | int == 3
+          - rke2_lb_type == "haproxy"
+          - rke2_lb_vip == "192.168.1.100"
+          - rke2_server_tls_san | length == 4
+          - rke2_audit_policy_enabled | bool
+          - rke2_pod_security_admission == "restricted"
+          - rke2_protect_kernel_defaults | bool
+        fail_msg: >-
+          group_vars/all.yml is not reaching the roles. Something is loading
+          roles/rke2_common/defaults/main.yml at a precedence above inventory
+          group_vars - check for a play-level vars_files.
+
+    - name: Group-scoped vars reach the roles
+      ansible.builtin.assert:
+        that:
+          - rke2_server_node_labels | length > 0
+          - rke2_server_node_taints | length > 0
+        fail_msg: "group_vars/masters.yml is not reaching the roles."
+
+    - name: Defaults not set in group_vars still resolve
+      ansible.builtin.assert:
+        that:
+          - rke2_channel == "stable"
+          - rke2_data_dir == "/var/lib/rancher/rke2"
+          - rke2_cluster_cidr == "10.42.0.0/16"
+        fail_msg: "roles/rke2_common/defaults/main.yml is not in scope."

@@ -16,8 +16,8 @@
 - name: "Validate restore parameters"
   hosts: masters[0]
   gather_facts: false
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Validate snapshot name is provided
       ansible.builtin.assert:
@@ -30,8 +30,8 @@
 - name: "Stop ALL masters before restore"
   hosts: masters
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Stop rke2-server
       ansible.builtin.systemd:
@@ -41,8 +41,8 @@
 - name: "Restore etcd on bootstrap master"
   hosts: masters[0]
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Build etcd restore command
       ansible.builtin.set_fact:
@@ -108,8 +108,8 @@
   hosts: masters[1:]
   become: true
   serial: 1
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Remove old etcd data
       ansible.builtin.file:
@@ -138,8 +138,8 @@
 - name: "Verify restore"
   hosts: masters[0]
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Wait for all masters to be Ready
       ansible.builtin.command:
