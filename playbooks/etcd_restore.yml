@@ -144,7 +144,7 @@
         cmd: >
           {{ rke2_bin_dir }}/kubectl
           --kubeconfig {{ rke2_config_dir }}/rke2.yaml
-          get node {{ ansible_hostname | lower }}
+          get node {{ rke2_node_name }}
           -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
       register: node_ready
       until: node_ready.stdout == "True"
