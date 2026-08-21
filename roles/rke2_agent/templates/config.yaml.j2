@@ -5,6 +5,20 @@ token: {{ rke2_server_token }}
 
 data-dir: {{ rke2_data_dir }}
 
+node-name: {{ rke2_node_name }}
+{% if rke2_node_ip | default('') | length > 0 %}
+node-ip: {{ rke2_node_ip }}
+{% endif %}
+{% if rke2_node_external_ip | default('') | length > 0 %}
+node-external-ip: {{ rke2_node_external_ip }}
+{% endif %}
+{% if rke2_selinux | default(false) | bool %}
+selinux: true
+{% endif %}
+{% if rke2_protect_kernel_defaults | default(false) %}
+protect-kernel-defaults: true
+{% endif %}
+
 {% if rke2_cis_profile | default('') | length > 0 %}
 profile: {{ rke2_cis_profile }}
 {% endif %}

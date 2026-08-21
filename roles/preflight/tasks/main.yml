@@ -5,6 +5,21 @@
       - ansible_os_family in ['RedHat', 'Debian']
     fail_msg: "Unsupported OS family: {{ ansible_os_family }}. Supported: RedHat, Debian"
 
+# These three are fatal at RKE2 startup, which surfaces as a service that never
+# comes up and a 300s wait on port 6443. Fail here instead, before anything is
+# installed.
+- name: Validate RKE2 configuration values
+  ansible.builtin.assert:
+    that:
+      - rke2_cis_profile | default('') in ['', 'cis', 'etcd']
+      - rke2_cni in ['canal', 'calico', 'cilium', 'none']
+      - rke2_lb_type in ['kube-vip', 'external', 'haproxy']
+    fail_msg: >-
+      Invalid configuration.
+      rke2_cis_profile must be one of "", "cis", "etcd" (got "{{ rke2_cis_profile | default('') }}");
+      rke2_cni must be canal/calico/cilium/none (got "{{ rke2_cni }}");
+      rke2_lb_type must be kube-vip/external/haproxy (got "{{ rke2_lb_type }}").
+
 - name: Run common prerequisites
   ansible.builtin.include_tasks: common.yml
 

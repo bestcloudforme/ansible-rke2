@@ -33,7 +33,6 @@ rke2_registry_mirror_tls_skip: false  # Skip TLS verification for registry mirro
 # EKS Distro (optional image override)
 # -----------------------------------------------------------------------------
 eksd_enabled: false
-eksd_version: "1-32-eks-1"
 eksd_registry: "public.ecr.aws/eks-distro"
 
 # -----------------------------------------------------------------------------
@@ -57,6 +56,8 @@ rke2_uninstall_script: "{{ rke2_install_bin_dir }}/rke2-uninstall.sh"
 # many cloud images is an FQDN - ansible_hostname truncates it and the lookup
 # then misses. Override if you set node-name in the RKE2 config.
 rke2_node_name: "{{ ansible_facts['nodename'] | lower }}"
+rke2_node_ip: ""            # node-ip, for multi-NIC hosts (empty = RKE2 default)
+rke2_node_external_ip: ""   # node-external-ip
 
 # Address other nodes should reach this one on. ansible_host is the SSH
 # address, which on cloud hosts is often public while the cluster talks over
@@ -101,8 +102,11 @@ rke2_etcd_snapshot_schedule: ""     # cron format, e.g. "0 */6 * * *"
 rke2_etcd_snapshot_retention: 5
 rke2_etcd_snapshot_dir: "{{ rke2_data_dir }}/server/db/snapshots"
 
-# Audit logging
+# Audit logging. RKE2 mounts its own log directory into the apiserver static
+# pod; a path outside it needs a kube-apiserver-extra-mount or the records never
+# reach the host.
 rke2_audit_policy_enabled: false
+rke2_audit_log_dir: "{{ rke2_data_dir }}/server/logs"
 rke2_audit_log_maxage: 30
 rke2_audit_log_maxbackup: 10
 rke2_audit_log_maxsize: 100
@@ -129,8 +133,14 @@ rke2_etcd_s3_secret_key: ""
 rke2_etcd_s3_folder: ""                # prefix/folder inside bucket
 rke2_etcd_s3_skip_ssl_verify: false
 
-# CIS/STIG Hardening Profile
-rke2_cis_profile: ""                   # "cis" or "cis-1.23" (empty = disabled)
+# Benchmark profile validated at startup. RKE2 accepts only "cis" or "etcd";
+# anything else, including the older "cis-1.23", is a fatal startup error.
+# "cis" also forces protect-kernel-defaults on.
+rke2_cis_profile: ""
+
+# Enable SELinux support in containerd. Supported on the RHEL family via the
+# rke2-selinux package, and the reason preflight no longer has to go permissive.
+rke2_selinux: false
 
 # Kernel hardening
 rke2_protect_kernel_defaults: false
