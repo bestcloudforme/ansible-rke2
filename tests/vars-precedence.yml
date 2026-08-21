@@ -19,7 +19,7 @@
     - name: Values from ha-example group_vars reach the roles
       ansible.builtin.assert:
         that:
-          - rke2_version == "v1.32.2+rke2r1"
+          - rke2_version == "v1.35.7+rke2r1"
           - rke2_cni == "cilium"
           - rke2_master_count | int == 3
           - rke2_lb_type == "haproxy"

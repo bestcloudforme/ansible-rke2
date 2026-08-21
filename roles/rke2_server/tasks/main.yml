@@ -32,5 +32,25 @@
 - name: Configure RKE2 server
   ansible.builtin.include_tasks: config.yml
 
+# The install script is guarded by `creates:`, so it is a no-op once the binary
+# exists. Without this, changing rke2_version and re-running install.yml reports
+# success while every node stays on the old version - which is what made the
+# documented rollback procedure a silent no-op.
+- name: Check the installed RKE2 version
+  ansible.builtin.command:
+    cmd: "{{ rke2_cli }} --version"
+  register: rke2_installed_version
+  changed_when: false
+
+- name: Installed version must match rke2_version
+  ansible.builtin.assert:
+    that:
+      - rke2_version in rke2_installed_version.stdout
+    fail_msg: >-
+      {{ inventory_hostname }} is running
+      {{ rke2_installed_version.stdout_lines[0] | default('an unknown version') }}
+      but rke2_version is {{ rke2_version }}. install.yml does not change the
+      version of an existing node - use upgrade.yml.
+
 - name: Start RKE2 server service
   ansible.builtin.include_tasks: service.yml
