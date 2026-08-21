@@ -2,23 +2,30 @@
 - name: Validate CNI plugin
   ansible.builtin.assert:
     that:
-      - rke2_cni in ['canal', 'calico', 'cilium']
-    fail_msg: "Unsupported CNI: {{ rke2_cni }}. Supported: canal, calico, cilium"
+      - rke2_cni in ['canal', 'calico', 'cilium', 'none']
+    fail_msg: "Unsupported CNI: {{ rke2_cni }}. Supported: canal, calico, cilium, none"
 
 - name: Wait for Kubernetes API before CNI check
   ansible.builtin.wait_for:
-    host: localhost
+    host: 127.0.0.1
     port: 6443
     timeout: 60
+  when: rke2_cni != 'none'
 
-- name: Verify Canal pods
-  ansible.builtin.include_tasks: verify_canal.yml
-  when: rke2_cni == 'canal'
-
-- name: Verify Calico pods
-  ansible.builtin.include_tasks: verify_calico.yml
-  when: rke2_cni == 'calico'
-
-- name: Verify Cilium pods
-  ansible.builtin.include_tasks: verify_cilium.yml
-  when: rke2_cni == 'cilium'
+- name: Wait for the CNI pods to exist and be Ready - {{ rke2_cni }}
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      KUBECTL="{{ rke2_bin_dir }}/kubectl --kubeconfig {{ rke2_config_dir }}/rke2.yaml"
+      TOTAL=$($KUBECTL get pods -A -l {{ cni_pod_selector[rke2_cni] }} --no-headers 2>/dev/null | wc -l)
+      NOT_READY=$($KUBECTL get pods -A -l {{ cni_pod_selector[rke2_cni] }} \
+        -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
+        | grep -v '^True$' | grep -c . || true)
+      [ "$TOTAL" -gt 0 ] && [ "$NOT_READY" -eq 0 ] && echo 0 || echo 1
+    executable: /bin/bash
+  register: cni_check
+  until: cni_check.stdout | trim | int == 0
+  retries: "{{ cni_wait_retries }}"
+  delay: "{{ cni_wait_delay }}"
+  changed_when: false
+  when: rke2_cni != 'none'
