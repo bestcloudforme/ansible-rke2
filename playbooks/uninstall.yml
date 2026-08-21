@@ -2,8 +2,6 @@
 - name: "Uninstall RKE2 from workers"
   hosts: workers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:
@@ -12,8 +10,6 @@
 - name: "Uninstall RKE2 from masters"
   hosts: masters
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:
@@ -22,8 +18,8 @@
 - name: "Uninstall HAProxy and Keepalived"
   hosts: loadbalancers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Stop keepalived
       ansible.builtin.systemd:

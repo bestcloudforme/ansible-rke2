@@ -54,7 +54,6 @@ ansible-playbook playbooks/install.yml \
 
 ```
 ansible-rke2/
-├── defaults/rke2_defaults.yml          # All default variables (single source of truth)
 ├── docs/                               # Operational runbooks and guides
 │   ├── upgrade-checklist.md
 │   ├── backup-restore-runbook.md
@@ -310,7 +309,8 @@ See `environments/ha-example/` for a complete example.
 
 ### Variables Reference
 
-All defaults are in `defaults/rke2_defaults.yml`. Override per-environment in `group_vars/`.
+All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
+`rke2_common`, so overriding a variable in `group_vars/` takes effect everywhere.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -409,7 +409,7 @@ cp -r environments/example environments/my-cluster
 # Edit hosts, IPs, and overrides
 ```
 
-Only override what differs from `defaults/rke2_defaults.yml`.
+Only override what differs from `roles/rke2_common/defaults/main.yml`.
 
 ## Security
 

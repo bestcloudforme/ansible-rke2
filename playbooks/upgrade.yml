@@ -2,8 +2,8 @@
 - name: "Preflight: version check"
   hosts: masters,workers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Check current RKE2 version
       ansible.builtin.command:
@@ -19,8 +19,8 @@
 - name: "Re-template HAProxy config"
   hosts: loadbalancers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Update HAProxy configuration
       ansible.builtin.template:
@@ -42,8 +42,6 @@
   hosts: masters
   become: true
   serial: "{{ rke2_upgrade_serial }}"
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:
@@ -53,8 +51,6 @@
   hosts: workers
   become: true
   serial: "{{ rke2_upgrade_agent_serial }}"
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:

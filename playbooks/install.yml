@@ -3,8 +3,8 @@
 - name: "Validate inventory and configuration"
   hosts: masters[0]
   gather_facts: false
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
+  roles:
+    - role: rke2_common
   tasks:
     - name: Validate rke2_version is set
       ansible.builtin.assert:
@@ -26,8 +26,6 @@
   hosts: loadbalancers
   become: true
   force_handlers: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: haproxy
       when: rke2_lb_type | default('external') == 'haproxy'
@@ -36,8 +34,6 @@
 - name: "Phase 1: OS prerequisites"
   hosts: masters,workers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: preflight
 
@@ -45,8 +41,6 @@
 - name: "Phase 2: Load balancer (kube-vip)"
   hosts: masters[0]
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lb
       when:
@@ -59,8 +53,6 @@
   become: true
   force_handlers: true
   serial: 1
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: rke2_server
   vars:
@@ -70,8 +62,6 @@
 - name: "Phase 4: EKS-D images"
   hosts: masters,workers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: eksd_images
       when: eksd_enabled | default(false) | bool
@@ -81,8 +71,6 @@
   hosts: workers
   become: true
   force_handlers: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: rke2_agent
 
@@ -90,7 +78,5 @@
 - name: "Phase 6: CNI verification"
   hosts: masters[0]
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: cni

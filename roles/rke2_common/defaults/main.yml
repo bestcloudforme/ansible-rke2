@@ -2,8 +2,9 @@
 # =============================================================================
 # RKE2 Global Defaults
 # =============================================================================
-# This is the single source of truth for all default variables.
-# Override per-environment in environments/<env>/inventory/group_vars/
+# Every role depends on rke2_common, so these are in scope wherever a role runs,
+# at role-defaults precedence. Override per-environment in
+# environments/<env>/inventory/group_vars/.
 
 # -----------------------------------------------------------------------------
 # RKE2 Core

@@ -16,8 +16,6 @@
 - name: "Take an etcd snapshot"
   hosts: masters[0]
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:

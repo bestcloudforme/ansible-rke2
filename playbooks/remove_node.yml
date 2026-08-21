@@ -9,8 +9,6 @@
 - name: "Remove node from cluster"
   hosts: masters[0]
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: lifecycle
   vars:
@@ -19,8 +17,6 @@
 - name: "Update HAProxy backends after master removal"
   hosts: loadbalancers
   become: true
-  vars_files:
-    - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
   roles:
     - role: haproxy
       when:
