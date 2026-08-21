@@ -6,7 +6,7 @@ Production-ready Ansible playbooks for deploying RKE2 Kubernetes clusters. Suppo
 
 - **Full Lifecycle**: install, upgrade, add/remove nodes, uninstall, etcd backup/restore, cert rotation
 - **HA Support**: 3-master clusters with HAProxy + keepalived VIP, or kube-vip, or external LB
-- **CIS Hardening**: Optional CIS 1.23 benchmark profile for security compliance
+- **CIS Hardening**: Optional `profile: cis` startup validation against the CIS Kubernetes Benchmark
 - **Multi-OS**: RHEL/Rocky/AlmaLinux 8+ and Ubuntu/Debian 20.04+
 - **CNI Choice**: Canal, Calico, or Cilium (with kube-proxy replacement and BPF masquerade)
 - **Airgap**: Online and offline installation support
@@ -325,6 +325,9 @@ All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
 | `rke2_cluster_cidr` | `10.42.0.0/16` | Pod network CIDR |
 | `rke2_install_bin_dir` | `/usr/bin` on RHEL-family, `/usr/local/bin` elsewhere | Where `get.rke2.io` installs the `rke2` CLI and its helper scripts |
 | `rke2_node_name` | full hostname, lowercased | Kubernetes node name used for cordon, drain and readiness lookups |
+| `rke2_node_ip` | `""` | `node-ip` to advertise, for multi-NIC hosts |
+| `rke2_node_external_ip` | `""` | `node-external-ip` to advertise |
+| `rke2_audit_log_dir` | `{{ rke2_data_dir }}/server/logs` | Audit log directory (RKE2 mounts this one into the apiserver pod) |
 | `rke2_service_cidr` | `10.43.0.0/16` | Service network CIDR |
 | `rke2_cilium_kube_proxy_replacement` | `true` | Replace kube-proxy with Cilium eBPF (when cni=cilium) |
 | `rke2_cilium_bpf_masquerade` | `true` | Use BPF masquerading (when cni=cilium) |
@@ -353,7 +356,8 @@ All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
 | `rke2_system_reserved_memory` | `""` | Memory reserved for system |
 | `rke2_eviction_hard` | `""` | Kubelet eviction thresholds (e.g. `memory.available<256Mi`) |
 | `rke2_protect_kernel_defaults` | `false` | Enforce kubelet kernel parameters |
-| `rke2_cis_profile` | `""` | CIS hardening profile: `cis` or `cis-1.23` |
+| `rke2_cis_profile` | `""` | Startup benchmark validation: `cis` or `etcd` |
+| `rke2_selinux` | `false` | Enable SELinux support in containerd |
 | **etcd S3 Backup** | | |
 | `rke2_etcd_s3_enabled` | `false` | Enable S3 backend for etcd snapshots |
 | `rke2_etcd_s3_endpoint` | `""` | S3 endpoint (e.g. `s3.amazonaws.com`) |
@@ -371,7 +375,6 @@ All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
 | `rke2_registry_mirror` | `""` | Private registry mirror URL |
 | **EKS Distro** | | |
 | `eksd_enabled` | `false` | Enable EKS-D image override |
-| `eksd_version` | `1-32-eks-1` | EKS-D release version |
 | **Lifecycle** | | |
 | `rke2_drain_timeout` | `300s` | Node drain timeout |
 | `rke2_upgrade_serial` | `1` | Master upgrade serial count |
