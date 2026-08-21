@@ -14,8 +14,8 @@
 #   Ensure you have a valid backup before proceeding.
 
 - name: "Validate restore parameters"
-  hosts: masters[0]
-  gather_facts: false
+  hosts: masters
+  become: true
   roles:
     - role: rke2_common
   tasks:
@@ -26,6 +26,24 @@
         fail_msg: >-
           rke2_etcd_restore_snapshot must be set.
           Use -e "rke2_etcd_restore_snapshot=<snapshot-name>" to specify.
+
+    # The next play stops rke2-server on every master. Anything that can fail
+    # has to fail here, while the control plane is still up.
+    - name: Locate the rke2 CLI
+      ansible.builtin.stat:
+        path: "{{ rke2_cli }}"
+      register: rke2_cli_stat
+
+    - name: Validate the rke2 CLI is present
+      ansible.builtin.assert:
+        that:
+          - rke2_cli_stat.stat.exists
+          - rke2_cli_stat.stat.executable
+        fail_msg: >-
+          rke2 CLI not found at {{ rke2_cli }} on {{ inventory_hostname }}.
+          get.rke2.io installs it under /usr/bin on RHEL-family (rpm) and
+          /usr/local/bin elsewhere (tarball). Set rke2_install_bin_dir if you
+          installed it somewhere else. Refusing to stop the control plane.
 
 - name: "Stop ALL masters before restore"
   hosts: masters
@@ -47,7 +65,7 @@
     - name: Build etcd restore command
       ansible.builtin.set_fact:
         _etcd_restore_cmd: >-
-          {{ rke2_bin_dir }}/rke2 server
+          {{ rke2_cli }} server
           --cluster-reset
           --cluster-reset-restore-path={{ rke2_etcd_restore_snapshot }}
           --data-dir {{ rke2_data_dir }}

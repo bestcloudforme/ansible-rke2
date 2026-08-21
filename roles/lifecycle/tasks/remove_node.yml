@@ -48,14 +48,14 @@
 
 - name: Run rke2-killall on removed node
   ansible.builtin.command:
-    cmd: /usr/local/bin/rke2-killall.sh
+    cmd: "{{ rke2_killall_script }}"
   delegate_to: "{{ _remove_target }}"
   ignore_errors: true
   changed_when: true
 
 - name: Run rke2-uninstall on removed node
   ansible.builtin.command:
-    cmd: /usr/local/bin/rke2-uninstall.sh
+    cmd: "{{ rke2_uninstall_script }}"
   delegate_to: "{{ _remove_target }}"
   ignore_errors: true
   changed_when: true

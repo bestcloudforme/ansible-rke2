@@ -41,7 +41,17 @@ eksd_registry: "public.ecr.aws/eks-distro"
 # -----------------------------------------------------------------------------
 rke2_data_dir: "/var/lib/rancher/rke2"
 rke2_config_dir: "/etc/rancher/rke2"
-rke2_bin_dir: "/var/lib/rancher/rke2/bin"
+
+# Runtime bundle shipped inside the data dir: kubectl, crictl, ctr, containerd.
+# Populated when the service first starts - the rke2 CLI is NOT here.
+rke2_bin_dir: "{{ rke2_data_dir }}/bin"
+
+# get.rke2.io installs by rpm on RHEL-family (/usr/bin) and by tarball
+# everywhere else (/usr/local/bin). Override if you force INSTALL_RKE2_METHOD.
+rke2_install_bin_dir: "{{ '/usr/bin' if ansible_facts['os_family'] == 'RedHat' else '/usr/local/bin' }}"
+rke2_cli: "{{ rke2_install_bin_dir }}/rke2"
+rke2_killall_script: "{{ rke2_install_bin_dir }}/rke2-killall.sh"
+rke2_uninstall_script: "{{ rke2_install_bin_dir }}/rke2-uninstall.sh"
 
 # -----------------------------------------------------------------------------
 # Load Balancer

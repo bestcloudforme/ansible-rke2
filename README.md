@@ -320,6 +320,7 @@ All defaults are in `roles/rke2_common/defaults/main.yml`. Every role depends on
 | `rke2_master_count` | `1` | Number of masters: `1` or `3` |
 | `rke2_channel` | `stable` | RKE2 release channel |
 | `rke2_cluster_cidr` | `10.42.0.0/16` | Pod network CIDR |
+| `rke2_install_bin_dir` | `/usr/bin` on RHEL-family, `/usr/local/bin` elsewhere | Where `get.rke2.io` installs the `rke2` CLI and its helper scripts |
 | `rke2_service_cidr` | `10.43.0.0/16` | Service network CIDR |
 | `rke2_cilium_kube_proxy_replacement` | `true` | Replace kube-proxy with Cilium eBPF (when cni=cilium) |
 | `rke2_cilium_bpf_masquerade` | `true` | Use BPF masquerading (when cni=cilium) |
