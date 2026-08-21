@@ -24,7 +24,10 @@
 
 - name: Wait for join endpoint to be reachable
   ansible.builtin.uri:
-    url: "https://{{ rke2_lb_vip if (rke2_lb_type in ['kube-vip', 'haproxy'] and rke2_lb_vip | default('') | length > 0) else rke2_lb_external_host }}:9345/cacerts"
+    url: >-
+      https://{{ rke2_lb_vip
+                 if (rke2_lb_type in ['kube-vip', 'haproxy'] and rke2_lb_vip | default('') | length > 0)
+                 else rke2_lb_external_host }}:9345/cacerts
     validate_certs: false
     status_code: [200]
   register: join_endpoint

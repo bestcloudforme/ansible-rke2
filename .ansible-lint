@@ -5,9 +5,10 @@ warn_list:
   - yaml[truthy]
   - name[casing]
   - no-changed-when
-
-skip_list:
-  - no-handler  # handlers are used but some tasks use inline handlers
+  # register/set_fact names are shared across roles here (the join token, the
+  # bootstrap flag), so a per-role prefix would be misleading.
+  - var-naming[no-role-prefix]
 
 exclude_paths:
   - .github/
+  - .ansible/

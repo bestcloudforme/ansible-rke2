@@ -15,7 +15,7 @@
         fail_msg: "Required: -e 'target_hosts=hostname'"
 
 - name: "Fetch token from bootstrap master"
-  hosts: "{{ groups['masters'][0] }}"
+  hosts: masters[0]
   become: true
   vars_files:
     - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
@@ -27,7 +27,7 @@
       no_log: true
 
 - name: "Preflight on new node"
-  hosts: "{{ target_hosts }}"
+  hosts: "{{ target_hosts | default([]) }}"
   become: true
   vars_files:
     - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
@@ -35,7 +35,7 @@
     - role: preflight
 
 - name: "Join new worker node"
-  hosts: "{{ target_hosts }}"
+  hosts: "{{ target_hosts | default([]) }}"
   become: true
   vars_files:
     - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"
@@ -44,7 +44,7 @@
       when: (node_role | default('worker')) == 'worker'
 
 - name: "Join new master node"
-  hosts: "{{ target_hosts }}"
+  hosts: "{{ target_hosts | default([]) }}"
   become: true
   vars_files:
     - "{{ playbook_dir }}/../defaults/rke2_defaults.yml"

@@ -49,7 +49,14 @@
   poll: 10
   no_log: true
   vars:
-    _s3_env: "{{ {'AWS_ACCESS_KEY_ID': rke2_etcd_s3_access_key, 'AWS_SECRET_ACCESS_KEY': rke2_etcd_s3_secret_key} if (rke2_etcd_s3_enabled | default(false) | bool and rke2_etcd_s3_access_key | default('') | length > 0) else {} }}"
+    _s3_env: >-
+      {{
+        {'AWS_ACCESS_KEY_ID': rke2_etcd_s3_access_key,
+         'AWS_SECRET_ACCESS_KEY': rke2_etcd_s3_secret_key}
+        if (rke2_etcd_s3_enabled | default(false) | bool
+            and rke2_etcd_s3_access_key | default('') | length > 0)
+        else {}
+      }}
 
 - name: Remove cluster-reset flag file
   ansible.builtin.file:

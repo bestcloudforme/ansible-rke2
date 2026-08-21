@@ -13,7 +13,7 @@
 #   ansible-playbook playbooks/etcd_backup.yml \
 #     -i environments/my-cluster/inventory/hosts.yml
 
-- name: "etcd snapshot backup"
+- name: "Take an etcd snapshot"
   hosts: masters[0]
   become: true
   vars_files:
