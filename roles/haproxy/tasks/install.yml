@@ -28,5 +28,7 @@
     reload: true
     state: present
   loop:
-    - { key: "net.ipv4.ip_nonlocal_bind", value: "1" }
-    - { key: "net.ipv4.ip_forward", value: "1" }
+    - key: net.ipv4.ip_nonlocal_bind
+      value: "1"
+    - key: net.ipv4.ip_forward
+      value: "1"
